@@ -1,1 +1,0 @@
-This folder contains the built output assets for the worker "sg-regulatory-data-mcp" generated at 2026-04-08T10:44:59.627Z.
