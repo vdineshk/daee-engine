@@ -1,0 +1,1 @@
+This folder contains the built output assets for the worker "sg-company-lookup-mcp" generated at 2026-04-08T10:45:21.092Z.
