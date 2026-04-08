@@ -487,6 +487,8 @@ function buildMeta(tier: "free" | "paid", callsRemainingToday: number) {
     related_tools: {
       "sg-regulatory-data": "https://sg-regulatory-data-mcp.sgdata.workers.dev",
       "asean-trade-rules": "https://asean-trade-rules-mcp.sgdata.workers.dev",
+      "sg-cpf-calculator": "https://sg-cpf-calculator-mcp.sgdata.workers.dev",
+      "sg-workpass-compass": "https://sg-workpass-compass-mcp.sgdata.workers.dev",
     },
   };
 }

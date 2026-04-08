@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SG Regulatory Data MCP | DAEE</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%); }
+        .card-bg { background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(71, 85, 105, 0.4); }
+        .glow { box-shadow: 0 0 40px rgba(59, 130, 246, 0.15); }
+        pre { tab-size: 2; }
+        .pricing-popular { border: 2px solid #3b82f6; }
+    </style>
+</head>
+<body class="gradient-bg text-gray-100 min-h-screen">
+
+    <!-- Header -->
+    <header class="border-b border-slate-700/50">
+        <div class="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
+            <div>
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl font-bold text-white tracking-tight">DAEE</span>
+                    <span class="text-slate-400 text-sm hidden sm:inline">DOMINION Agent Economy Engine</span>
+                </div>
+            </div>
+            <a href="mailto:daee@dominion.sg?subject=API Key Request for sg-regulatory-data-mcp"
+               class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors">
+                Get API Key
+            </a>
+        </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="max-w-6xl mx-auto px-6 py-20">
+        <div class="max-w-3xl">
+            <div class="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 rounded-full px-4 py-1.5 text-blue-400 text-sm mb-6">
+                <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                Live on Cloudflare Workers
+            </div>
+            <h1 class="text-4xl sm:text-5xl font-bold text-white mb-4 leading-tight">
+                SG Regulatory Data MCP
+            </h1>
+            <p class="text-xl text-slate-300 mb-8 leading-relaxed">
+                Structured Singapore regulatory data for AI agents &mdash; foreign worker levies, ACRA filing deadlines, PWM wages, compliance checklists, public holidays.
+            </p>
+            <div class="flex flex-wrap gap-4">
+                <a href="https://sg-regulatory-data-mcp.sgdata.workers.dev"
+                   target="_blank"
+                   class="bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-lg text-sm font-medium transition-colors">
+                    Live Worker &rarr;
+                </a>
+                <a href="#pricing"
+                   class="border border-slate-600 hover:border-slate-500 text-slate-300 px-6 py-3 rounded-lg text-sm font-medium transition-colors">
+                    View Pricing
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tools -->
+    <section class="max-w-6xl mx-auto px-6 py-16">
+        <h2 class="text-2xl font-bold text-white mb-2">Available Tools</h2>
+        <p class="text-slate-400 mb-10">MCP-compatible tools your AI agent can call directly.</p>
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="card-bg rounded-xl p-6 glow">
+                <div class="text-blue-400 font-mono text-sm mb-2">get_levy_rates</div>
+                <h3 class="text-white font-semibold mb-2">Foreign Worker Levy Rates</h3>
+                <p class="text-slate-400 text-sm">Retrieve current levy rates for S Pass, Work Permit, and other foreign worker categories by sector and tier.</p>
+            </div>
+            <div class="card-bg rounded-xl p-6 glow">
+                <div class="text-blue-400 font-mono text-sm mb-2">get_filing_deadlines</div>
+                <h3 class="text-white font-semibold mb-2">ACRA Filing Deadlines</h3>
+                <p class="text-slate-400 text-sm">Get upcoming ACRA filing deadlines including Annual Returns, financial statements, and AGM dates for Singapore companies.</p>
+            </div>
+            <div class="card-bg rounded-xl p-6 glow">
+                <div class="text-blue-400 font-mono text-sm mb-2">get_pwm_wages</div>
+                <h3 class="text-white font-semibold mb-2">Progressive Wage Model</h3>
+                <p class="text-slate-400 text-sm">Look up PWM minimum wage requirements by sector, job role, and effective date for compliance planning.</p>
+            </div>
+            <div class="card-bg rounded-xl p-6 glow">
+                <div class="text-blue-400 font-mono text-sm mb-2">check_compliance_status</div>
+                <h3 class="text-white font-semibold mb-2">Compliance Checklists</h3>
+                <p class="text-slate-400 text-sm">Check regulatory compliance status across multiple frameworks including MOM, ACRA, IRAS, and sector-specific requirements.</p>
+            </div>
+            <div class="card-bg rounded-xl p-6 glow">
+                <div class="text-blue-400 font-mono text-sm mb-2">get_sg_holidays</div>
+                <h3 class="text-white font-semibold mb-2">Public Holidays</h3>
+                <p class="text-slate-400 text-sm">Retrieve Singapore public holidays by year for payroll calculations, leave management, and business planning.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Code Example -->
+    <section class="max-w-6xl mx-auto px-6 py-16">
+        <h2 class="text-2xl font-bold text-white mb-2">Quick Start</h2>
+        <p class="text-slate-400 mb-8">Call the MCP endpoint directly with curl.</p>
+        <div class="card-bg rounded-xl overflow-hidden">
+            <div class="flex items-center gap-2 px-4 py-3 border-b border-slate-700/50">
+                <span class="w-3 h-3 rounded-full bg-red-500/60"></span>
+                <span class="w-3 h-3 rounded-full bg-yellow-500/60"></span>
+                <span class="w-3 h-3 rounded-full bg-green-500/60"></span>
+                <span class="text-slate-400 text-xs ml-2 font-mono">terminal</span>
+            </div>
+            <pre class="p-6 text-sm text-slate-300 overflow-x-auto"><code>curl -X POST https://sg-regulatory-data-mcp.sgdata.workers.dev/mcp \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{
+    "method": "tools/call",
+    "params": {
+      "name": "get_levy_rates",
+      "arguments": {
+        "pass_type": "s_pass",
+        "sector": "services"
+      }
+    }
+  }'</code></pre>
+        </div>
+        <div class="card-bg rounded-xl overflow-hidden mt-4">
+            <div class="flex items-center gap-2 px-4 py-3 border-b border-slate-700/50">
+                <span class="text-slate-400 text-xs font-mono">response</span>
+            </div>
+            <pre class="p-6 text-sm text-green-400 overflow-x-auto"><code>{
+  "result": {
+    "pass_type": "s_pass",
+    "sector": "services",
+    "tier_1_levy": 450,
+    "tier_2_levy": 650,
+    "effective_date": "2024-09-01",
+    "currency": "SGD"
+  }
+}</code></pre>
+        </div>
+    </section>
+
+    <!-- Pricing -->
+    <section id="pricing" class="max-w-6xl mx-auto px-6 py-16">
+        <h2 class="text-2xl font-bold text-white mb-2">Pricing</h2>
+        <p class="text-slate-400 mb-10">Simple, predictable pricing for AI agent workloads.</p>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <!-- Free -->
+            <div class="card-bg rounded-xl p-6">
+                <h3 class="text-white font-semibold mb-1">Free</h3>
+                <div class="text-3xl font-bold text-white mb-1">$0</div>
+                <p class="text-slate-400 text-sm mb-6">Get started instantly</p>
+                <ul class="text-sm text-slate-300 space-y-3 mb-8">
+                    <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5">&#10003;</span> 5 calls / day</li>
+                    <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5">&#10003;</span> All tools included</li>
+                    <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5">&#10003;</span> Community support</li>
+                </ul>
+                <a href="mailto:daee@dominion.sg?subject=API Key Request for sg-regulatory-data-mcp (Free)"
+                   class="block text-center border border-slate-600 hover:border-slate-500 text-slate-300 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors">
+                    Get API Key
+                </a>
+            </div>
+            <!-- Starter -->
+            <div class="card-bg rounded-xl p-6">
+                <h3 class="text-white font-semibold mb-1">Starter</h3>
+                <div class="text-3xl font-bold text-white mb-1">$29<span class="text-lg text-slate-400 font-normal">/mo</span></div>
+                <p class="text-slate-400 text-sm mb-6">For small teams</p>
+                <ul class="text-sm text-slate-300 space-y-3 mb-8">
+                    <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5">&#10003;</span> 1,000 calls / month</li>
+                    <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5">&#10003;</span> All tools included</li>
+                    <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5">&#10003;</span> Email support</li>
+                </ul>
+                <a href="mailto:daee@dominion.sg?subject=API Key Request for sg-regulatory-data-mcp (Starter)"
+                   class="block text-center border border-slate-600 hover:border-slate-500 text-slate-300 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors">
+                    Get API Key
+                </a>
+            </div>
+            <!-- Pro -->
+            <div class="pricing-popular card-bg rounded-xl p-6 relative">
+                <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs px-3 py-1 rounded-full font-medium">Popular</div>
+                <h3 class="text-white font-semibold mb-1">Pro</h3>
+                <div class="text-3xl font-bold text-white mb-1">$99<span class="text-lg text-slate-400 font-normal">/mo</span></div>
+                <p class="text-slate-400 text-sm mb-6">For growing businesses</p>
+                <ul class="text-sm text-slate-300 space-y-3 mb-8">
+                    <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5">&#10003;</span> 10,000 calls / month</li>
+                    <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5">&#10003;</span> All tools included</li>
+                    <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5">&#10003;</span> Priority support</li>
+                    <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5">&#10003;</span> Usage analytics</li>
+                </ul>
+                <a href="mailto:daee@dominion.sg?subject=API Key Request for sg-regulatory-data-mcp (Pro)"
+                   class="block text-center bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors">
+                    Get API Key
+                </a>
+            </div>
+            <!-- Enterprise -->
+            <div class="card-bg rounded-xl p-6">
+                <h3 class="text-white font-semibold mb-1">Enterprise</h3>
+                <div class="text-3xl font-bold text-white mb-1">$299<span class="text-lg text-slate-400 font-normal">/mo</span></div>
+                <p class="text-slate-400 text-sm mb-6">For large-scale ops</p>
+                <ul class="text-sm text-slate-300 space-y-3 mb-8">
+                    <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5">&#10003;</span> Unlimited calls</li>
+                    <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5">&#10003;</span> All tools included</li>
+                    <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5">&#10003;</span> Dedicated support</li>
+                    <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5">&#10003;</span> SLA guarantee</li>
+                    <li class="flex items-start gap-2"><span class="text-green-400 mt-0.5">&#10003;</span> Custom integrations</li>
+                </ul>
+                <a href="mailto:daee@dominion.sg?subject=API Key Request for sg-regulatory-data-mcp (Enterprise)"
+                   class="block text-center border border-slate-600 hover:border-slate-500 text-slate-300 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors">
+                    Get API Key
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Cross Links -->
+    <section class="max-w-6xl mx-auto px-6 py-16 border-t border-slate-700/50">
+        <h2 class="text-xl font-bold text-white mb-6">Other DAEE Services</h2>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <a href="https://sg-company-lookup-mcp.sgdata.workers.dev" target="_blank" class="card-bg rounded-lg p-4 hover:border-blue-500/40 transition-colors">
+                <div class="text-white font-semibold text-sm">SG Company Lookup</div>
+                <p class="text-slate-400 text-xs mt-1">UEN search, company officers, industry stats</p>
+            </a>
+            <a href="https://sg-cpf-calculator-mcp.sgdata.workers.dev" target="_blank" class="card-bg rounded-lg p-4 hover:border-blue-500/40 transition-colors">
+                <div class="text-white font-semibold text-sm">SG CPF Calculator</div>
+                <p class="text-slate-400 text-xs mt-1">CPF contributions, allocations, take-home pay</p>
+            </a>
+            <a href="https://sg-workpass-compass-mcp.sgdata.workers.dev" target="_blank" class="card-bg rounded-lg p-4 hover:border-blue-500/40 transition-colors">
+                <div class="text-white font-semibold text-sm">SG WorkPass COMPASS</div>
+                <p class="text-slate-400 text-xs mt-1">COMPASS scoring, EP eligibility, quotas</p>
+            </a>
+            <a href="https://asean-trade-rules-mcp.sgdata.workers.dev" target="_blank" class="card-bg rounded-lg p-4 hover:border-blue-500/40 transition-colors">
+                <div class="text-white font-semibold text-sm">ASEAN Trade Rules</div>
+                <p class="text-slate-400 text-xs mt-1">FTA eligibility, tariff savings, documentation</p>
+            </a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-700/50">
+        <div class="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="text-slate-400 text-sm">
+                Built under <span class="text-slate-300">Singapore IMDA Agentic AI Framework</span>
+            </div>
+            <div class="text-slate-500 text-sm">
+                &copy; 2026 DAEE &middot; DOMINION Agent Economy Engine
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>

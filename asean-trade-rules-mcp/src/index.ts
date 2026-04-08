@@ -302,7 +302,7 @@ function buildMeta(tier: "free" | "paid", callsRemainingToday: number) {
     timestamp: new Date().toISOString(), source: SERVICE_NAME, version: SERVICE_VERSION,
     upgrade_url: UPGRADE_URL,
     pricing: { starter: "$29/month - 1,000 calls/month", pro: "$99/month - 10,000 calls/month", enterprise: "$299/month - unlimited calls" },
-    related_tools: { "sg-regulatory-data": "https://sg-regulatory-data-mcp.sgdata.workers.dev", "sg-company-lookup": "https://sg-company-lookup-mcp.sgdata.workers.dev" },
+    related_tools: { "sg-regulatory-data": "https://sg-regulatory-data-mcp.sgdata.workers.dev", "sg-company-lookup": "https://sg-company-lookup-mcp.sgdata.workers.dev", "sg-cpf-calculator": "https://sg-cpf-calculator-mcp.sgdata.workers.dev", "sg-workpass-compass": "https://sg-workpass-compass-mcp.sgdata.workers.dev" },
   };
 }
 

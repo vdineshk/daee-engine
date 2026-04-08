@@ -3,6 +3,8 @@ import { getFilingDeadlines, FilingDeadlinesInput } from "./tools/filing-deadlin
 import { getPwmWages, PwmWagesInput } from "./tools/pwm-wages";
 import { checkComplianceStatus, ComplianceStatusInput } from "./tools/compliance-status";
 import { getSgHolidays, SgHolidaysInput } from "./tools/sg-holidays";
+import { getEpSalaryBenchmarks, EpSalaryBenchmarksInput } from "./tools/ep-salary-benchmarks";
+import { getSipEligibility, SipEligibilityInput } from "./tools/sip-eligibility";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -60,7 +62,7 @@ interface ToolDefinition {
 // ---------------------------------------------------------------------------
 
 const SERVICE_NAME = "sg-regulatory-data-mcp";
-const SERVICE_VERSION = "1.0.0";
+const SERVICE_VERSION = "1.1.0";
 const UPGRADE_URL = "https://daee-sg-regulatory.vercel.app";
 const FREE_TIER_DAILY_LIMIT = 5;
 const FREE_TIER_DELAY_MS = 3000;
@@ -168,6 +170,54 @@ const TOOLS: ToolDefinition[] = [
       },
     },
   },
+  {
+    name: "get_ep_salary_benchmarks",
+    description:
+      "Employment Pass qualifying salary benchmarks by sector and age. Returns minimum salary thresholds for EP applications including age-based adjustments and COMPASS exemption threshold. Use this tool when you need to check EP salary requirements for hiring foreign professionals in Singapore.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        sector: {
+          type: "string",
+          description: "Sector: general or financial_services. Leave empty for all sectors.",
+        },
+        age: {
+          type: "number",
+          description: "Applicant age in years. Salary threshold increases by $200 per year above age 23. Defaults to 23.",
+        },
+      },
+    },
+  },
+  {
+    name: "get_sip_eligibility",
+    description:
+      "Simplified Insolvency Programme (SIP) 2.0 eligibility check. Returns Track D (Dissolution) and Track R (Restructuring) criteria and optionally assesses eligibility based on company details. Use this tool when you need to check if a Singapore company qualifies for simplified insolvency or restructuring under SIP 2.0 launched January 2026.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        entity_type: {
+          type: "string",
+          description: "Company entity type (for context only, all Singapore-incorporated companies eligible).",
+        },
+        total_liabilities: {
+          type: "number",
+          description: "Total company liabilities in SGD. Track D limit: $150,000. Track R limit: $2,000,000.",
+        },
+        annual_revenue: {
+          type: "number",
+          description: "Annual revenue in SGD. Track R limit: $10,000,000.",
+        },
+        num_employees: {
+          type: "number",
+          description: "Number of employees. Track R limit: 30.",
+        },
+        num_creditors: {
+          type: "number",
+          description: "Number of creditors. Track D limit: 30. Track R limit: 50.",
+        },
+      },
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -190,6 +240,8 @@ function buildMeta(tier: "free" | "paid", callsRemainingToday: number): Response
     related_tools: {
       "sg-company-lookup": "https://sg-company-lookup-mcp.sgdata.workers.dev",
       "asean-trade-rules": "https://asean-trade-rules-mcp.sgdata.workers.dev",
+      "sg-cpf-calculator": "https://sg-cpf-calculator-mcp.sgdata.workers.dev",
+      "sg-workpass-compass": "https://sg-workpass-compass-mcp.sgdata.workers.dev",
     },
   };
 }
@@ -322,6 +374,25 @@ function executeTool(
         num_business_days: args.num_business_days as number | undefined,
       };
       const result = getSgHolidays(input);
+      return { data: result, summary: result.summary };
+    }
+    case "get_ep_salary_benchmarks": {
+      const input: EpSalaryBenchmarksInput = {
+        sector: args.sector as string | undefined,
+        age: args.age as number | undefined,
+      };
+      const result = getEpSalaryBenchmarks(input);
+      return { data: result, summary: result.summary };
+    }
+    case "get_sip_eligibility": {
+      const input: SipEligibilityInput = {
+        entity_type: args.entity_type as string | undefined,
+        total_liabilities: args.total_liabilities as number | undefined,
+        annual_revenue: args.annual_revenue as number | undefined,
+        num_employees: args.num_employees as number | undefined,
+        num_creditors: args.num_creditors as number | undefined,
+      };
+      const result = getSipEligibility(input);
       return { data: result, summary: result.summary };
     }
     default:
