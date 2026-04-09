@@ -30,6 +30,8 @@ const SERVICE_VERSION = "1.0.0";
 const UPGRADE_URL = "https://daee-sg-company.vercel.app";
 const FREE_TIER_DAILY_LIMIT = 5;
 const FREE_TIER_DELAY_MS = 3000;
+const OBSERVATORY_URL = "https://dominion-observatory.sgdata.workers.dev/mcp";
+const SELF_URL = "https://sg-company-lookup-mcp.sgdata.workers.dev";
 
 // ---------------------------------------------------------------------------
 // UEN Validation & Parsing (core data moat)
@@ -490,6 +492,8 @@ function buildMeta(tier: "free" | "paid", callsRemainingToday: number) {
       "sg-cpf-calculator": "https://sg-cpf-calculator-mcp.sgdata.workers.dev",
       "sg-workpass-compass": "https://sg-workpass-compass-mcp.sgdata.workers.dev",
     },
+    trust_score_url: `https://dominion-observatory.sgdata.workers.dev/api/trust?url=${encodeURIComponent(SELF_URL)}`,
+    observatory: "https://dominion-observatory.sgdata.workers.dev",
   };
 }
 
@@ -566,10 +570,12 @@ async function handleToolCall(
   id: string | number | null,
   params: Record<string, unknown>,
   env: Env,
-  request: Request
+  request: Request,
+  ctx: ExecutionContext
 ): Promise<{ response: JsonRpcResponse; status: number }> {
   const toolName = params.name as string;
   const toolArgs = (params.arguments as Record<string, unknown>) || {};
+  const startTime = Date.now();
 
   if (!toolName || !TOOLS.some((t) => t.name === toolName)) {
     return {
@@ -603,11 +609,34 @@ async function handleToolCall(
   try {
     const { data, summary } = executeTool(toolName, toolArgs);
     const meta = buildMeta(tier, callsRemaining);
+
+    ctx.waitUntil(
+      fetch(OBSERVATORY_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0", id: Date.now(), method: "tools/call",
+          params: { name: "report_interaction", arguments: { server_url: SELF_URL, success: true, latency_ms: Date.now() - startTime, tool_name: toolName, http_status: 200 } },
+        }),
+      }).catch(() => {})
+    );
+
     return {
       response: jsonRpcSuccess(id, { content: [{ type: "text", text: JSON.stringify({ data, meta }, null, 2) }], _meta: { summary } }),
       status: 200,
     };
   } catch (error) {
+    ctx.waitUntil(
+      fetch(OBSERVATORY_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0", id: Date.now(), method: "tools/call",
+          params: { name: "report_interaction", arguments: { server_url: SELF_URL, success: false, latency_ms: Date.now() - startTime, tool_name: toolName, http_status: 500 } },
+        }),
+      }).catch(() => {})
+    );
+
     return {
       response: jsonRpcError(id, -32603, error instanceof Error ? error.message : String(error), { meta: buildMeta(tier, callsRemaining) }),
       status: 500,
@@ -620,7 +649,7 @@ async function handleToolCall(
 // ---------------------------------------------------------------------------
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       if (request.method === "OPTIONS") {
         return new Response(null, {
@@ -664,7 +693,7 @@ export default {
           case "tools/list":
             return jsonResponse(jsonRpcSuccess(id, { tools: TOOLS }));
           case "tools/call": {
-            const { response, status } = await handleToolCall(id, params, env, request);
+            const { response, status } = await handleToolCall(id, params, env, request, ctx);
             return jsonResponse(response, status);
           }
           default:

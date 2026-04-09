@@ -12,6 +12,8 @@ const SERVICE_VERSION = "1.0.0";
 const UPGRADE_URL = "https://daee-asean-trade.vercel.app";
 const FREE_TIER_DAILY_LIMIT = 5;
 const FREE_TIER_DELAY_MS = 3000;
+const OBSERVATORY_URL = "https://dominion-observatory.sgdata.workers.dev/mcp";
+const SELF_URL = "https://asean-trade-rules-mcp.sgdata.workers.dev";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -303,6 +305,8 @@ function buildMeta(tier: "free" | "paid", callsRemainingToday: number) {
     upgrade_url: UPGRADE_URL,
     pricing: { starter: "$29/month - 1,000 calls/month", pro: "$99/month - 10,000 calls/month", enterprise: "$299/month - unlimited calls" },
     related_tools: { "sg-regulatory-data": "https://sg-regulatory-data-mcp.sgdata.workers.dev", "sg-company-lookup": "https://sg-company-lookup-mcp.sgdata.workers.dev", "sg-cpf-calculator": "https://sg-cpf-calculator-mcp.sgdata.workers.dev", "sg-workpass-compass": "https://sg-workpass-compass-mcp.sgdata.workers.dev" },
+    trust_score_url: `https://dominion-observatory.sgdata.workers.dev/api/trust?url=${encodeURIComponent(SELF_URL)}`,
+    observatory: "https://dominion-observatory.sgdata.workers.dev",
   };
 }
 
@@ -328,9 +332,10 @@ function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, Authorization" } });
 }
 
-async function handleToolCall(id: string | number | null, params: Record<string, unknown>, env: Env, request: Request) {
+async function handleToolCall(id: string | number | null, params: Record<string, unknown>, env: Env, request: Request, ctx: ExecutionContext) {
   const toolName = params.name as string;
   const toolArgs = (params.arguments as Record<string, unknown>) || {};
+  const startTime = Date.now();
   if (!toolName || !TOOLS.some(t => t.name === toolName)) return { response: jsonRpcError(id, -32602, `Unknown tool: ${toolName}`), status: 400 };
 
   const authHeader = request.headers.get("Authorization") || "";
@@ -348,8 +353,14 @@ async function handleToolCall(id: string | number | null, params: Record<string,
 
   try {
     const { data, summary } = executeTool(toolName, toolArgs);
+    ctx.waitUntil(
+      fetch(OBSERVATORY_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: Date.now(), method: "tools/call", params: { name: "report_interaction", arguments: { server_url: SELF_URL, success: true, latency_ms: Date.now() - startTime, tool_name: toolName, http_status: 200 } } }) }).catch(() => {})
+    );
     return { response: jsonRpcSuccess(id, { content: [{ type: "text", text: JSON.stringify({ data, meta: buildMeta(tier, callsRemaining) }, null, 2) }], _meta: { summary } }), status: 200 };
   } catch (error) {
+    ctx.waitUntil(
+      fetch(OBSERVATORY_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: Date.now(), method: "tools/call", params: { name: "report_interaction", arguments: { server_url: SELF_URL, success: false, latency_ms: Date.now() - startTime, tool_name: toolName, http_status: 500 } } }) }).catch(() => {})
+    );
     return { response: jsonRpcError(id, -32603, error instanceof Error ? error.message : String(error), { meta: buildMeta(tier, callsRemaining) }), status: 500 };
   }
 }
@@ -359,7 +370,7 @@ async function handleToolCall(id: string | number | null, params: Record<string,
 // ---------------------------------------------------------------------------
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, Authorization", "Access-Control-Max-Age": "86400" } });
       const path = new URL(request.url).pathname;
@@ -376,7 +387,7 @@ export default {
           case "initialize": return jsonResponse(jsonRpcSuccess(id, { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: SERVICE_NAME, version: SERVICE_VERSION } }));
           case "notifications/initialized": return jsonResponse(jsonRpcSuccess(id, {}));
           case "tools/list": return jsonResponse(jsonRpcSuccess(id, { tools: TOOLS }));
-          case "tools/call": { const { response, status } = await handleToolCall(id, (body.params || {}) as Record<string, unknown>, env, request); return jsonResponse(response, status); }
+          case "tools/call": { const { response, status } = await handleToolCall(id, (body.params || {}) as Record<string, unknown>, env, request, ctx); return jsonResponse(response, status); }
           default: return jsonResponse(jsonRpcError(id, -32601, `Method not found: ${body.method}`), 400);
         }
       }
