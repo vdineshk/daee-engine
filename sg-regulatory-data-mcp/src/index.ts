@@ -41,10 +41,9 @@ interface ResponseMeta {
     pro: string;
     enterprise: string;
   };
-  related_tools: {
-    "sg-company-lookup": string;
-    "asean-trade-rules": string;
-  };
+  related_tools: Record<string, string>;
+  trust_score_url: string;
+  observatory: string;
 }
 
 interface ToolDefinition {
@@ -62,10 +61,47 @@ interface ToolDefinition {
 // ---------------------------------------------------------------------------
 
 const SERVICE_NAME = "sg-regulatory-data-mcp";
-const SERVICE_VERSION = "1.1.0";
+const SERVICE_VERSION = "1.2.0";
 const UPGRADE_URL = "https://daee-sg-regulatory.vercel.app";
 const FREE_TIER_DAILY_LIMIT = 5;
 const FREE_TIER_DELAY_MS = 3000;
+
+// ---------------------------------------------------------------------------
+// Observatory Integration (DAEE Phase 3.5 — MANDATORY)
+// ---------------------------------------------------------------------------
+
+const OBSERVATORY_URL = "https://dominion-observatory.sgdata.workers.dev/mcp";
+const SELF_URL = "https://sg-regulatory-data-mcp.sgdata.workers.dev/mcp";
+
+function reportToObservatory(
+  ctx: ExecutionContext,
+  toolName: string,
+  success: boolean,
+  latencyMs: number,
+  httpStatus: number
+): void {
+  ctx.waitUntil(
+    fetch(OBSERVATORY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: Date.now(),
+        method: "tools/call",
+        params: {
+          name: "report_interaction",
+          arguments: {
+            server_url: SELF_URL,
+            success,
+            latency_ms: latencyMs,
+            tool_name: toolName,
+            http_status: httpStatus,
+          },
+        },
+      }),
+    }).catch(() => {}) // silent fail — never block main response
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Tool definitions
@@ -243,6 +279,8 @@ function buildMeta(tier: "free" | "paid", callsRemainingToday: number): Response
       "sg-cpf-calculator": "https://sg-cpf-calculator-mcp.sgdata.workers.dev",
       "sg-workpass-compass": "https://sg-workpass-compass-mcp.sgdata.workers.dev",
     },
+    trust_score_url: `https://dominion-observatory.sgdata.workers.dev/api/trust?url=${encodeURIComponent(SELF_URL)}`,
+    observatory: "https://dominion-observatory.sgdata.workers.dev",
   };
 }
 
@@ -425,7 +463,8 @@ async function handleToolCall(
   id: string | number | null,
   params: Record<string, unknown>,
   env: Env,
-  request: Request
+  request: Request,
+  ctx: ExecutionContext
 ): Promise<{ response: JsonRpcResponse; status: number }> {
   const toolName = params.name as string;
   const toolArgs = (params.arguments as Record<string, unknown>) || {};
@@ -477,9 +516,11 @@ async function handleToolCall(
   }
 
   // --- Execute the tool ---
+  const startTime = Date.now();
   try {
     const { data, summary } = executeTool(toolName, toolArgs);
     const meta = buildMeta(tier, callsRemaining);
+    reportToObservatory(ctx, toolName, true, Date.now() - startTime, 200);
 
     return {
       response: jsonRpcSuccess(id, {
@@ -495,6 +536,7 @@ async function handleToolCall(
     };
   } catch (error) {
     const meta = buildMeta(tier, callsRemaining);
+    reportToObservatory(ctx, toolName, false, Date.now() - startTime, 500);
     return {
       response: jsonRpcError(id, -32603, error instanceof Error ? error.message : String(error), { meta }),
       status: 500,
@@ -560,7 +602,7 @@ function handleIndex(): Response {
   });
 }
 
-async function handleMcp(request: Request, env: Env): Promise<Response> {
+async function handleMcp(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   let body: JsonRpcRequest;
 
   try {
@@ -595,7 +637,7 @@ async function handleMcp(request: Request, env: Env): Promise<Response> {
     }
 
     case "tools/call": {
-      const { response, status } = await handleToolCall(id, params, env, request);
+      const { response, status } = await handleToolCall(id, params, env, request, ctx);
       return jsonResponse(response, status);
     }
 
@@ -613,7 +655,7 @@ async function handleMcp(request: Request, env: Env): Promise<Response> {
 // ---------------------------------------------------------------------------
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       // Handle CORS preflight
       if (request.method === "OPTIONS") {
@@ -641,7 +683,7 @@ export default {
       }
 
       if (request.method === "POST" && path === "/mcp") {
-        return await handleMcp(request, env);
+        return await handleMcp(request, env, ctx);
       }
 
       if (request.method === "GET" && path === "/") {
