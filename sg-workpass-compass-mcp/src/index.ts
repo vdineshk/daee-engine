@@ -5,12 +5,14 @@
 interface Env { RATE_LIMIT: KVNamespace; API_KEYS: KVNamespace; }
 interface JsonRpcRequest { jsonrpc: "2.0"; id: string | number | null; method: string; params?: Record<string, unknown>; }
 interface JsonRpcResponse { jsonrpc: "2.0"; id: string | number | null; result?: unknown; error?: { code: number; message: string; data?: unknown }; }
-interface ResponseMeta { tier: "free" | "paid"; calls_remaining_today: number; timestamp: string; source: string; version: string; upgrade_url: string; pricing: { starter: string; pro: string; enterprise: string }; related_tools: Record<string, string>; }
+interface ResponseMeta { tier: "free" | "paid"; calls_remaining_today: number; timestamp: string; source: string; version: string; upgrade_url: string; trust_score_url: string; observatory: string; pricing: { starter: string; pro: string; enterprise: string }; related_tools: Record<string, string>; }
 interface ToolDefinition { name: string; description: string; inputSchema: { type: "object"; properties: Record<string, unknown>; required?: string[] }; }
 
 const SERVICE_NAME = "sg-workpass-compass-mcp";
-const SERVICE_VERSION = "1.0.0";
-const UPGRADE_URL = "https://daee-sg-workpass.vercel.app";
+const SERVICE_VERSION = "1.1.0";
+const UPGRADE_URL = "https://daee-sg-workpass.pages.dev";
+const SELF_URL = "https://sg-workpass-compass-mcp.sgdata.workers.dev";
+const OBSERVATORY_URL = "https://dominion-observatory.sgdata.workers.dev/mcp";
 const FREE_TIER_DAILY_LIMIT = 5;
 const FREE_TIER_DELAY_MS = 3000;
 
@@ -331,6 +333,8 @@ const TOOLS: ToolDefinition[] = [
 function buildMeta(tier: "free" | "paid", callsRemainingToday: number): ResponseMeta {
   return {
     tier, calls_remaining_today: callsRemainingToday, timestamp: new Date().toISOString(), source: SERVICE_NAME, version: SERVICE_VERSION, upgrade_url: UPGRADE_URL,
+    trust_score_url: `https://dominion-observatory.sgdata.workers.dev/api/trust?url=${encodeURIComponent(SELF_URL + "/mcp")}`,
+    observatory: "https://dominion-observatory.sgdata.workers.dev",
     pricing: { starter: "$29/month - 1,000 calls/month", pro: "$99/month - 10,000 calls/month", enterprise: "$299/month - unlimited calls" },
     related_tools: {
       "sg-regulatory-data": "https://sg-regulatory-data-mcp.sgdata.workers.dev",
@@ -377,7 +381,7 @@ function handleInitialize(id: string | number | null): JsonRpcResponse {
   return jsonRpcSuccess(id, { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: SERVICE_NAME, version: SERVICE_VERSION } });
 }
 
-async function handleToolCall(id: string | number | null, params: Record<string, unknown>, env: Env, request: Request): Promise<{ response: JsonRpcResponse; status: number }> {
+async function handleToolCall(id: string | number | null, params: Record<string, unknown>, env: Env, request: Request, ctx: ExecutionContext): Promise<{ response: JsonRpcResponse; status: number }> {
   const toolName = params.name as string; const toolArgs = (params.arguments as Record<string, unknown>) || {};
   if (!toolName) return { response: jsonRpcError(id, -32602, "Missing tool name"), status: 400 };
   if (!TOOLS.some(t => t.name === toolName)) return { response: jsonRpcError(id, -32602, `Unknown tool: ${toolName}`), status: 400 };
@@ -396,8 +400,24 @@ async function handleToolCall(id: string | number | null, params: Record<string,
   }
 
   try {
+    const startTime = Date.now();
     const { data, summary } = executeTool(toolName, toolArgs);
-    return { response: jsonRpcSuccess(id, { content: [{ type: "text", text: JSON.stringify({ data, meta: buildMeta(tier, callsRemaining) }, null, 2) }], _meta: { summary } }), status: 200 };
+    const endTime = Date.now();
+    const meta = buildMeta(tier, callsRemaining);
+    ctx.waitUntil(
+      fetch(OBSERVATORY_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0", id: endTime, method: "tools/call",
+          params: { name: "report_interaction", arguments: {
+            server_url: SELF_URL + "/mcp", success: true,
+            latency_ms: endTime - startTime, tool_name: toolName, http_status: 200,
+          }},
+        }),
+      }).catch(() => {})
+    );
+    return { response: jsonRpcSuccess(id, { content: [{ type: "text", text: JSON.stringify({ data, meta }, null, 2) }], _meta: { summary } }), status: 200 };
   } catch (error) { return { response: jsonRpcError(id, -32603, error instanceof Error ? error.message : String(error), { meta: buildMeta(tier, callsRemaining) }), status: 500 }; }
 }
 
@@ -424,7 +444,7 @@ function handleIndex(): Response {
   });
 }
 
-async function handleMcp(request: Request, env: Env): Promise<Response> {
+async function handleMcp(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   let body: JsonRpcRequest;
   try { body = (await request.json()) as JsonRpcRequest; } catch { return jsonResponse(jsonRpcError(null, -32700, "Parse error"), 400); }
   if (body.jsonrpc !== "2.0") return jsonResponse(jsonRpcError(body.id ?? null, -32600, "jsonrpc must be '2.0'"), 400);
@@ -433,19 +453,19 @@ async function handleMcp(request: Request, env: Env): Promise<Response> {
     case "initialize": return jsonResponse(handleInitialize(id));
     case "notifications/initialized": return jsonResponse(jsonRpcSuccess(id, {}));
     case "tools/list": return jsonResponse(jsonRpcSuccess(id, { tools: TOOLS }));
-    case "tools/call": { const { response, status } = await handleToolCall(id, (body.params || {}) as Record<string, unknown>, env, request); return jsonResponse(response, status); }
+    case "tools/call": { const { response, status } = await handleToolCall(id, (body.params || {}) as Record<string, unknown>, env, request, ctx); return jsonResponse(response, status); }
     default: return jsonResponse(jsonRpcError(id, -32601, `Method not found: ${body.method}`), 400);
   }
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, Authorization", "Access-Control-Max-Age": "86400" } });
       const path = new URL(request.url).pathname;
       if (request.method === "GET" && path === "/health") return handleHealth();
       if (request.method === "GET" && path === "/.well-known/mcp.json") return handleDiscovery();
-      if (request.method === "POST" && path === "/mcp") return await handleMcp(request, env);
+      if (request.method === "POST" && path === "/mcp") return await handleMcp(request, env, ctx);
       if (request.method === "GET" && path === "/") return handleIndex();
       return jsonResponse({ error: "Not found", available_endpoints: ["/", "/health", "/.well-known/mcp.json", "/mcp"] }, 404);
     } catch (error) { return jsonResponse({ error: "Internal server error", message: error instanceof Error ? error.message : String(error), service: SERVICE_NAME, timestamp: new Date().toISOString() }, 500); }
