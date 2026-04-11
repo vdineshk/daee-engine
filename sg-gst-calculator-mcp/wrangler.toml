@@ -1,0 +1,11 @@
+name = "sg-gst-calculator-mcp"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "65f420612b9f4774ad206d47746f04b3"
+
+[[kv_namespaces]]
+binding = "API_KEYS"
+id = "b3333ff1faad40248f2fe718dedf40db"
