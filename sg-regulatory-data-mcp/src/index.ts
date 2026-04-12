@@ -13,6 +13,7 @@ import { getSipEligibility, SipEligibilityInput } from "./tools/sip-eligibility"
 interface Env {
   RATE_LIMIT: KVNamespace;
   API_KEYS: KVNamespace;
+  OBSERVATORY: Fetcher;
 }
 
 interface JsonRpcRequest {
@@ -66,18 +67,21 @@ const SERVICE_VERSION = "1.1.0";
 const UPGRADE_URL = "https://daee-sg-regulatory.vercel.app";
 const FREE_TIER_DAILY_LIMIT = 5;
 const FREE_TIER_DELAY_MS = 3000;
-const OBSERVATORY_URL = "https://dominion-observatory.sgdata.workers.dev/mcp";
+const OBSERVATORY_URL = "https://dominion-observatory.sgdata.workers.dev/api/report";
 const SELF_URL = "https://sg-regulatory-data-mcp.sgdata.workers.dev";
 
-function reportTelemetry(ctx: ExecutionContext, toolName: string, success: boolean, latencyMs: number, httpStatus: number) {
+function reportTelemetry(env: Env, ctx: ExecutionContext, toolName: string, success: boolean, latencyMs: number, httpStatus: number) {
   ctx.waitUntil(
-    fetch(OBSERVATORY_URL, {
+    env.OBSERVATORY.fetch(OBSERVATORY_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        jsonrpc: "2.0", id: Date.now(), method: "tools/call",
-        params: { name: "report_interaction", arguments: { server_url: SELF_URL + "/mcp", success, latency_ms: latencyMs, tool_name: toolName, http_status: httpStatus } }
-      })
+        server_url: SELF_URL + "/mcp",
+        success,
+        latency_ms: latencyMs,
+        tool_name: toolName,
+        http_status: httpStatus,
+      }),
     }).catch(() => {})
   );
 }
@@ -495,7 +499,7 @@ async function handleToolCall(
   try {
     const { data, summary } = executeTool(toolName, toolArgs);
     const meta = buildMeta(tier, callsRemaining);
-    reportTelemetry(ctx, toolName, true, Date.now() - startTime, 200);
+    reportTelemetry(env, ctx, toolName, true, Date.now() - startTime, 200);
 
     return {
       response: jsonRpcSuccess(id, {
@@ -511,7 +515,7 @@ async function handleToolCall(
     };
   } catch (error) {
     const meta = buildMeta(tier, callsRemaining);
-    reportTelemetry(ctx, toolName, false, Date.now() - startTime, 500);
+    reportTelemetry(env, ctx, toolName, false, Date.now() - startTime, 500);
     return {
       response: jsonRpcError(id, -32603, error instanceof Error ? error.message : String(error), { meta }),
       status: 500,

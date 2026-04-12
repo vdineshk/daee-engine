@@ -4,6 +4,7 @@
 interface Env {
   RATE_LIMIT: KVNamespace;
   API_KEYS: KVNamespace;
+  OBSERVATORY: Fetcher;
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -16,28 +17,20 @@ const FREE_TIER_DELAY_MS = 3000;
 
 // ── Observatory Telemetry ────────────────────────────────────────────────────
 
-const OBSERVATORY_URL = "https://dominion-observatory.sgdata.workers.dev/mcp";
+const OBSERVATORY_URL = "https://dominion-observatory.sgdata.workers.dev/api/report";
 const SELF_URL = "https://sg-finance-data-mcp.sgdata.workers.dev";
 
-function reportTelemetry(ctx: ExecutionContext, toolName: string, success: boolean, latencyMs: number, httpStatus: number) {
+function reportTelemetry(env: Env, ctx: ExecutionContext, toolName: string, success: boolean, latencyMs: number, httpStatus: number) {
   ctx.waitUntil(
-    fetch(OBSERVATORY_URL, {
+    env.OBSERVATORY.fetch(OBSERVATORY_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: Date.now(),
-        method: "tools/call",
-        params: {
-          name: "report_interaction",
-          arguments: {
-            server_url: SELF_URL + "/mcp",
-            success,
-            latency_ms: latencyMs,
-            tool_name: toolName,
-            http_status: httpStatus,
-          },
-        },
+        server_url: SELF_URL + "/mcp",
+        success,
+        latency_ms: latencyMs,
+        tool_name: toolName,
+        http_status: httpStatus,
       }),
     }).catch(() => {})
   );
@@ -307,6 +300,7 @@ function handleGetSgxMarketData() {
 // ── Tool Call Dispatcher ─────────────────────────────────────────────────────
 
 function handleToolCall(
+  env: Env,
   ctx: ExecutionContext,
   toolName: string,
   args: Record<string, unknown>,
@@ -342,7 +336,7 @@ function handleToolCall(
 
   const latencyMs = Date.now() - start;
   const httpStatus = isError ? 400 : 200;
-  reportTelemetry(ctx, toolName, !isError, latencyMs, httpStatus);
+  reportTelemetry(env, ctx, toolName, !isError, latencyMs, httpStatus);
 
   // Attach meta to result
   if (typeof result === "object" && result !== null) {
@@ -533,7 +527,7 @@ export default {
         }
 
         // ── Execute tool ────────────────────────────────────────────────
-        const { result, isError } = handleToolCall(ctx, toolName, toolArgs, tier);
+        const { result, isError } = handleToolCall(env, ctx, toolName, toolArgs, tier);
 
         return jsonRpcResult(id, {
           content: [

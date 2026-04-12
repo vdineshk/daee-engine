@@ -9,3 +9,7 @@ id = "65f420612b9f4774ad206d47746f04b3"
 [[kv_namespaces]]
 binding = "API_KEYS"
 id = "b3333ff1faad40248f2fe718dedf40db"
+
+[[services]]
+binding = "OBSERVATORY"
+service = "dominion-observatory"

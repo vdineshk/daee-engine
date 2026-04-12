@@ -2,7 +2,7 @@
 // sg-workpass-compass-mcp — Singapore COMPASS & Work Pass Eligibility MCP Server
 // ---------------------------------------------------------------------------
 
-interface Env { RATE_LIMIT: KVNamespace; API_KEYS: KVNamespace; }
+interface Env { RATE_LIMIT: KVNamespace; API_KEYS: KVNamespace; OBSERVATORY: Fetcher; }
 interface JsonRpcRequest { jsonrpc: "2.0"; id: string | number | null; method: string; params?: Record<string, unknown>; }
 interface JsonRpcResponse { jsonrpc: "2.0"; id: string | number | null; result?: unknown; error?: { code: number; message: string; data?: unknown }; }
 interface ResponseMeta { tier: "free" | "paid"; calls_remaining_today: number; timestamp: string; source: string; version: string; upgrade_url: string; pricing: { starter: string; pro: string; enterprise: string }; related_tools: Record<string, string>; }
@@ -13,18 +13,21 @@ const SERVICE_VERSION = "1.1.0";
 const UPGRADE_URL = "https://daee-sg-workpass.vercel.app";
 const FREE_TIER_DAILY_LIMIT = 5;
 const FREE_TIER_DELAY_MS = 3000;
-const OBSERVATORY_URL = "https://dominion-observatory.sgdata.workers.dev/mcp";
+const OBSERVATORY_URL = "https://dominion-observatory.sgdata.workers.dev/api/report";
 const SELF_URL = "https://sg-workpass-compass-mcp.sgdata.workers.dev";
 
-function reportTelemetry(ctx: ExecutionContext, toolName: string, success: boolean, latencyMs: number, httpStatus: number) {
+function reportTelemetry(env: Env, ctx: ExecutionContext, toolName: string, success: boolean, latencyMs: number, httpStatus: number) {
   ctx.waitUntil(
-    fetch(OBSERVATORY_URL, {
+    env.OBSERVATORY.fetch(OBSERVATORY_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        jsonrpc: "2.0", id: Date.now(), method: "tools/call",
-        params: { name: "report_interaction", arguments: { server_url: SELF_URL + "/mcp", success, latency_ms: latencyMs, tool_name: toolName, http_status: httpStatus } }
-      })
+        server_url: SELF_URL + "/mcp",
+        success,
+        latency_ms: latencyMs,
+        tool_name: toolName,
+        http_status: httpStatus,
+      }),
     }).catch(() => {})
   );
 }
@@ -416,10 +419,10 @@ async function handleToolCall(id: string | number | null, params: Record<string,
 
   try {
     const { data, summary } = executeTool(toolName, toolArgs);
-    reportTelemetry(ctx, toolName, true, Date.now() - startTime, 200);
+    reportTelemetry(env, ctx, toolName, true, Date.now() - startTime, 200);
     return { response: jsonRpcSuccess(id, { content: [{ type: "text", text: JSON.stringify({ data, meta: buildMeta(tier, callsRemaining) }, null, 2) }], _meta: { summary } }), status: 200 };
   } catch (error) {
-    reportTelemetry(ctx, toolName, false, Date.now() - startTime, 500);
+    reportTelemetry(env, ctx, toolName, false, Date.now() - startTime, 500);
     return { response: jsonRpcError(id, -32603, error instanceof Error ? error.message : String(error), { meta: buildMeta(tier, callsRemaining) }), status: 500 };
   }
 }

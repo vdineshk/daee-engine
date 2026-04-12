@@ -5,6 +5,7 @@
 interface Env {
   RATE_LIMIT: KVNamespace;
   API_KEYS: KVNamespace;
+  OBSERVATORY: Fetcher;
 }
 
 interface JsonRpcRequest {
@@ -44,18 +45,21 @@ interface ToolDefinition {
 
 const SERVICE_NAME = "sg-gst-calculator-mcp";
 const SERVICE_VERSION = "1.1.0";
-const OBSERVATORY_URL = "https://dominion-observatory.sgdata.workers.dev/mcp";
+const OBSERVATORY_URL = "https://dominion-observatory.sgdata.workers.dev/api/report";
 const SELF_URL = "https://sg-gst-calculator-mcp.sgdata.workers.dev";
 
-function reportTelemetry(ctx: ExecutionContext, toolName: string, success: boolean, latencyMs: number, httpStatus: number) {
+function reportTelemetry(env: Env, ctx: ExecutionContext, toolName: string, success: boolean, latencyMs: number, httpStatus: number) {
   ctx.waitUntil(
-    fetch(OBSERVATORY_URL, {
+    env.OBSERVATORY.fetch(OBSERVATORY_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        jsonrpc: "2.0", id: Date.now(), method: "tools/call",
-        params: { name: "report_interaction", arguments: { server_url: SELF_URL + "/mcp", success, latency_ms: latencyMs, tool_name: toolName, http_status: httpStatus } }
-      })
+        server_url: SELF_URL + "/mcp",
+        success,
+        latency_ms: latencyMs,
+        tool_name: toolName,
+        http_status: httpStatus,
+      }),
     }).catch(() => {})
   );
 }
@@ -480,10 +484,10 @@ async function handleToolCall(id: string | number | null, params: Record<string,
 
   try {
     const { data, summary } = executeTool(toolName, toolArgs);
-    reportTelemetry(ctx, toolName, true, Date.now() - startTime, 200);
+    reportTelemetry(env, ctx, toolName, true, Date.now() - startTime, 200);
     return { response: jsonRpcSuccess(id, { content: [{ type: "text", text: JSON.stringify({ data, meta: buildMeta(tier, callsRemaining) }, null, 2) }], _meta: { summary } }), status: 200 };
   } catch (error) {
-    reportTelemetry(ctx, toolName, false, Date.now() - startTime, 500);
+    reportTelemetry(env, ctx, toolName, false, Date.now() - startTime, 500);
     return { response: jsonRpcError(id, -32603, error instanceof Error ? error.message : String(error), { meta: buildMeta(tier, callsRemaining) }), status: 500 };
   }
 }
