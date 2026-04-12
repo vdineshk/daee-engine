@@ -43,7 +43,22 @@ interface ToolDefinition {
 // ---------------------------------------------------------------------------
 
 const SERVICE_NAME = "sg-cpf-calculator-mcp";
-const SERVICE_VERSION = "1.0.0";
+const SERVICE_VERSION = "1.1.0";
+const OBSERVATORY_URL = "https://dominion-observatory.sgdata.workers.dev/mcp";
+const SELF_URL = "https://sg-cpf-calculator-mcp.sgdata.workers.dev";
+
+function reportTelemetry(ctx: ExecutionContext, toolName: string, success: boolean, latencyMs: number, httpStatus: number) {
+  ctx.waitUntil(
+    fetch(OBSERVATORY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0", id: Date.now(), method: "tools/call",
+        params: { name: "report_interaction", arguments: { server_url: SELF_URL + "/mcp", success, latency_ms: latencyMs, tool_name: toolName, http_status: httpStatus } }
+      })
+    }).catch(() => {})
+  );
+}
 const UPGRADE_URL = "https://daee-sg-cpf.vercel.app";
 const FREE_TIER_DAILY_LIMIT = 5;
 const FREE_TIER_DELAY_MS = 3000;
@@ -355,6 +370,9 @@ function buildMeta(tier: "free" | "paid", callsRemainingToday: number): Response
       "asean-trade-rules": "https://asean-trade-rules-mcp.sgdata.workers.dev",
       "sg-workpass-compass": "https://sg-workpass-compass-mcp.sgdata.workers.dev",
     },
+    trust_score_url: `https://dominion-observatory.sgdata.workers.dev/api/trust?url=${encodeURIComponent(SELF_URL + "/mcp")}`,
+    observatory: "https://dominion-observatory.sgdata.workers.dev",
+    telemetry: "This server reports anonymized interaction metrics (success/fail, latency, tool name) to the Dominion Observatory for trust scoring. No query content or user data is collected.",
   };
 }
 
@@ -433,7 +451,8 @@ function handleToolsList(id: string | number | null): JsonRpcResponse {
   return jsonRpcSuccess(id, { tools: TOOLS });
 }
 
-async function handleToolCall(id: string | number | null, params: Record<string, unknown>, env: Env, request: Request): Promise<{ response: JsonRpcResponse; status: number }> {
+async function handleToolCall(id: string | number | null, params: Record<string, unknown>, env: Env, request: Request, ctx: ExecutionContext): Promise<{ response: JsonRpcResponse; status: number }> {
+  const startTime = Date.now();
   const toolName = params.name as string;
   const toolArgs = (params.arguments as Record<string, unknown>) || {};
 
@@ -461,8 +480,10 @@ async function handleToolCall(id: string | number | null, params: Record<string,
 
   try {
     const { data, summary } = executeTool(toolName, toolArgs);
+    reportTelemetry(ctx, toolName, true, Date.now() - startTime, 200);
     return { response: jsonRpcSuccess(id, { content: [{ type: "text", text: JSON.stringify({ data, meta: buildMeta(tier, callsRemaining) }, null, 2) }], _meta: { summary } }), status: 200 };
   } catch (error) {
+    reportTelemetry(ctx, toolName, false, Date.now() - startTime, 500);
     return { response: jsonRpcError(id, -32603, error instanceof Error ? error.message : String(error), { meta: buildMeta(tier, callsRemaining) }), status: 500 };
   }
 }
@@ -499,7 +520,7 @@ function handleIndex(): Response {
   });
 }
 
-async function handleMcp(request: Request, env: Env): Promise<Response> {
+async function handleMcp(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   let body: JsonRpcRequest;
   try { body = (await request.json()) as JsonRpcRequest; } catch { return jsonResponse(jsonRpcError(null, -32700, "Parse error"), 400); }
   if (body.jsonrpc !== "2.0") return jsonResponse(jsonRpcError(body.id ?? null, -32600, "jsonrpc must be '2.0'"), 400);
@@ -509,7 +530,7 @@ async function handleMcp(request: Request, env: Env): Promise<Response> {
     case "initialize": return jsonResponse(handleInitialize(id));
     case "notifications/initialized": return jsonResponse(jsonRpcSuccess(id, {}));
     case "tools/list": return jsonResponse(handleToolsList(id));
-    case "tools/call": { const { response, status } = await handleToolCall(id, (body.params || {}) as Record<string, unknown>, env, request); return jsonResponse(response, status); }
+    case "tools/call": { const { response, status } = await handleToolCall(id, (body.params || {}) as Record<string, unknown>, env, request, ctx); return jsonResponse(response, status); }
     default: return jsonResponse(jsonRpcError(id, -32601, `Method not found: ${body.method}`), 400);
   }
 }
@@ -519,7 +540,7 @@ async function handleMcp(request: Request, env: Env): Promise<Response> {
 // ---------------------------------------------------------------------------
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       if (request.method === "OPTIONS") {
         return new Response(null, { status: 204, headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, Authorization", "Access-Control-Max-Age": "86400" } });
@@ -527,7 +548,7 @@ export default {
       const path = new URL(request.url).pathname;
       if (request.method === "GET" && path === "/health") return handleHealth();
       if (request.method === "GET" && path === "/.well-known/mcp.json") return handleDiscovery();
-      if (request.method === "POST" && path === "/mcp") return await handleMcp(request, env);
+      if (request.method === "POST" && path === "/mcp") return await handleMcp(request, env, ctx);
       if (request.method === "GET" && path === "/") return handleIndex();
       return jsonResponse({ error: "Not found", available_endpoints: ["/", "/health", "/.well-known/mcp.json", "/mcp"] }, 404);
     } catch (error) {

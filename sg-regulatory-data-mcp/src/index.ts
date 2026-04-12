@@ -66,6 +66,21 @@ const SERVICE_VERSION = "1.1.0";
 const UPGRADE_URL = "https://daee-sg-regulatory.vercel.app";
 const FREE_TIER_DAILY_LIMIT = 5;
 const FREE_TIER_DELAY_MS = 3000;
+const OBSERVATORY_URL = "https://dominion-observatory.sgdata.workers.dev/mcp";
+const SELF_URL = "https://sg-regulatory-data-mcp.sgdata.workers.dev";
+
+function reportTelemetry(ctx: ExecutionContext, toolName: string, success: boolean, latencyMs: number, httpStatus: number) {
+  ctx.waitUntil(
+    fetch(OBSERVATORY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0", id: Date.now(), method: "tools/call",
+        params: { name: "report_interaction", arguments: { server_url: SELF_URL + "/mcp", success, latency_ms: latencyMs, tool_name: toolName, http_status: httpStatus } }
+      })
+    }).catch(() => {})
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Tool definitions
@@ -243,6 +258,9 @@ function buildMeta(tier: "free" | "paid", callsRemainingToday: number): Response
       "sg-cpf-calculator": "https://sg-cpf-calculator-mcp.sgdata.workers.dev",
       "sg-workpass-compass": "https://sg-workpass-compass-mcp.sgdata.workers.dev",
     },
+    trust_score_url: `https://dominion-observatory.sgdata.workers.dev/api/trust?url=${encodeURIComponent(SELF_URL + "/mcp")}`,
+    observatory: "https://dominion-observatory.sgdata.workers.dev",
+    telemetry: "This server reports anonymized interaction metrics (success/fail, latency, tool name) to the Dominion Observatory for trust scoring. No query content or user data is collected.",
   };
 }
 
@@ -425,8 +443,10 @@ async function handleToolCall(
   id: string | number | null,
   params: Record<string, unknown>,
   env: Env,
-  request: Request
+  request: Request,
+  ctx: ExecutionContext
 ): Promise<{ response: JsonRpcResponse; status: number }> {
+  const startTime = Date.now();
   const toolName = params.name as string;
   const toolArgs = (params.arguments as Record<string, unknown>) || {};
 
@@ -445,7 +465,6 @@ async function handleToolCall(
     };
   }
 
-  // --- Rate limiting / auth ---
   const authHeader = request.headers.get("Authorization") || "";
   const apiKey = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
   const clientIp = request.headers.get("CF-Connecting-IP") || request.headers.get("X-Forwarded-For") || "unknown";
@@ -455,9 +474,8 @@ async function handleToolCall(
 
   if (apiKey && await validateApiKey(env, apiKey)) {
     tier = "paid";
-    callsRemaining = -1; // unlimited
+    callsRemaining = -1;
   } else {
-    // Free tier rate limiting
     const rateCheck = await checkRateLimit(env, clientIp);
     if (!rateCheck.allowed) {
       const meta = buildMeta("free", 0);
@@ -470,16 +488,14 @@ async function handleToolCall(
       };
     }
 
-    // Apply free tier delay
     await new Promise((r) => setTimeout(r, FREE_TIER_DELAY_MS));
-
     callsRemaining = await incrementRateLimit(env, clientIp);
   }
 
-  // --- Execute the tool ---
   try {
     const { data, summary } = executeTool(toolName, toolArgs);
     const meta = buildMeta(tier, callsRemaining);
+    reportTelemetry(ctx, toolName, true, Date.now() - startTime, 200);
 
     return {
       response: jsonRpcSuccess(id, {
@@ -495,6 +511,7 @@ async function handleToolCall(
     };
   } catch (error) {
     const meta = buildMeta(tier, callsRemaining);
+    reportTelemetry(ctx, toolName, false, Date.now() - startTime, 500);
     return {
       response: jsonRpcError(id, -32603, error instanceof Error ? error.message : String(error), { meta }),
       status: 500,
@@ -560,7 +577,7 @@ function handleIndex(): Response {
   });
 }
 
-async function handleMcp(request: Request, env: Env): Promise<Response> {
+async function handleMcp(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   let body: JsonRpcRequest;
 
   try {
@@ -595,7 +612,7 @@ async function handleMcp(request: Request, env: Env): Promise<Response> {
     }
 
     case "tools/call": {
-      const { response, status } = await handleToolCall(id, params, env, request);
+      const { response, status } = await handleToolCall(id, params, env, request, ctx);
       return jsonResponse(response, status);
     }
 
@@ -613,7 +630,7 @@ async function handleMcp(request: Request, env: Env): Promise<Response> {
 // ---------------------------------------------------------------------------
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       // Handle CORS preflight
       if (request.method === "OPTIONS") {
@@ -641,7 +658,7 @@ export default {
       }
 
       if (request.method === "POST" && path === "/mcp") {
-        return await handleMcp(request, env);
+        return await handleMcp(request, env, ctx);
       }
 
       if (request.method === "GET" && path === "/") {

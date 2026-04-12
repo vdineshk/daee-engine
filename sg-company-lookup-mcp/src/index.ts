@@ -26,8 +26,23 @@ interface JsonRpcResponse {
 // ---------------------------------------------------------------------------
 
 const SERVICE_NAME = "sg-company-lookup-mcp";
-const SERVICE_VERSION = "1.0.0";
+const SERVICE_VERSION = "1.1.0";
 const UPGRADE_URL = "https://daee-sg-company.vercel.app";
+const OBSERVATORY_URL = "https://dominion-observatory.sgdata.workers.dev/mcp";
+const SELF_URL = "https://sg-company-lookup-mcp.sgdata.workers.dev";
+
+function reportTelemetry(ctx: ExecutionContext, toolName: string, success: boolean, latencyMs: number, httpStatus: number) {
+  ctx.waitUntil(
+    fetch(OBSERVATORY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0", id: Date.now(), method: "tools/call",
+        params: { name: "report_interaction", arguments: { server_url: SELF_URL + "/mcp", success, latency_ms: latencyMs, tool_name: toolName, http_status: httpStatus } }
+      })
+    }).catch(() => {})
+  );
+}
 const FREE_TIER_DAILY_LIMIT = 5;
 const FREE_TIER_DELAY_MS = 3000;
 
@@ -490,6 +505,9 @@ function buildMeta(tier: "free" | "paid", callsRemainingToday: number) {
       "sg-cpf-calculator": "https://sg-cpf-calculator-mcp.sgdata.workers.dev",
       "sg-workpass-compass": "https://sg-workpass-compass-mcp.sgdata.workers.dev",
     },
+    trust_score_url: `https://dominion-observatory.sgdata.workers.dev/api/trust?url=${encodeURIComponent(SELF_URL + "/mcp")}`,
+    observatory: "https://dominion-observatory.sgdata.workers.dev",
+    telemetry: "This server reports anonymized interaction metrics (success/fail, latency, tool name) to the Dominion Observatory for trust scoring. No query content or user data is collected.",
   };
 }
 
@@ -566,8 +584,10 @@ async function handleToolCall(
   id: string | number | null,
   params: Record<string, unknown>,
   env: Env,
-  request: Request
+  request: Request,
+  ctx: ExecutionContext
 ): Promise<{ response: JsonRpcResponse; status: number }> {
+  const startTime = Date.now();
   const toolName = params.name as string;
   const toolArgs = (params.arguments as Record<string, unknown>) || {};
 
@@ -603,11 +623,13 @@ async function handleToolCall(
   try {
     const { data, summary } = executeTool(toolName, toolArgs);
     const meta = buildMeta(tier, callsRemaining);
+    reportTelemetry(ctx, toolName, true, Date.now() - startTime, 200);
     return {
       response: jsonRpcSuccess(id, { content: [{ type: "text", text: JSON.stringify({ data, meta }, null, 2) }], _meta: { summary } }),
       status: 200,
     };
   } catch (error) {
+    reportTelemetry(ctx, toolName, false, Date.now() - startTime, 500);
     return {
       response: jsonRpcError(id, -32603, error instanceof Error ? error.message : String(error), { meta: buildMeta(tier, callsRemaining) }),
       status: 500,
@@ -620,7 +642,7 @@ async function handleToolCall(
 // ---------------------------------------------------------------------------
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       if (request.method === "OPTIONS") {
         return new Response(null, {
@@ -664,7 +686,7 @@ export default {
           case "tools/list":
             return jsonResponse(jsonRpcSuccess(id, { tools: TOOLS }));
           case "tools/call": {
-            const { response, status } = await handleToolCall(id, params, env, request);
+            const { response, status } = await handleToolCall(id, params, env, request, ctx);
             return jsonResponse(response, status);
           }
           default:
