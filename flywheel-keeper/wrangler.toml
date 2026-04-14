@@ -1,0 +1,52 @@
+name = "flywheel-keeper"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# Cron trigger: every 5 minutes. 288 ticks/day.
+[triggers]
+crons = ["*/5 * * * *"]
+
+# KV for persisting tick state.
+[[kv_namespaces]]
+binding = "KEEPER_STATE"
+id = "7b315509b34e41849e5a64453bfd0105"
+
+# Service bindings — internal RPC dispatch to the 8 Builder servers.
+# Using service bindings instead of https://*.sgdata.workers.dev/* fetches
+# avoids Cloudflare Worker-to-Worker loop detection on the same zone and
+# is faster (no TLS, no edge hop).
+[[services]]
+binding = "SG_REG"
+service = "sg-regulatory-data-mcp"
+
+[[services]]
+binding = "SG_COMPANY"
+service = "sg-company-lookup-mcp"
+
+[[services]]
+binding = "ASEAN_TRADE"
+service = "asean-trade-rules-mcp"
+
+[[services]]
+binding = "SG_CPF"
+service = "sg-cpf-calculator-mcp"
+
+[[services]]
+binding = "SG_WORKPASS"
+service = "sg-workpass-compass-mcp"
+
+[[services]]
+binding = "SG_GST"
+service = "sg-gst-calculator-mcp"
+
+[[services]]
+binding = "SG_FINANCE"
+service = "sg-finance-data-mcp"
+
+[[services]]
+binding = "SG_WEATHER"
+service = "sg-weather-data-mcp"
+
+[[services]]
+binding = "OBSERVATORY"
+service = "dominion-observatory"
