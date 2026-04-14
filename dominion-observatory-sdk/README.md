@@ -3,15 +3,21 @@
 One-line agent behavioral telemetry — the data collection flywheel of the
 [Dominion Observatory](https://dominion-observatory.sgdata.workers.dev).
 
-Install with **zero dependencies and zero package manager**:
+**Python — pip (recommended):**
 
-```js
-// TS / JS / Deno / Bun / Workers
+```bash
+pip install dominion-observatory-sdk
+```
+
+**TypeScript / JS — CDN (zero-install, works in Workers, Deno, Bun, Node 18+):**
+
+```ts
 import { report, checkTrust, instrument } from "https://sdk-cdn.sgdata.workers.dev/v1/observatory.mjs";
 ```
 
+**Python — CDN alternative (single file, stdlib only):**
+
 ```bash
-# Python — single file, stdlib only (Python 3.9+)
 curl -O https://sdk-cdn.sgdata.workers.dev/v1/observatory.py
 ```
 
@@ -20,9 +26,8 @@ Install page with copy-paste snippets: <https://sdk-cdn.sgdata.workers.dev>
 - [TypeScript source](./typescript)
 - [Python source](./python)
 
-> npm + PyPI mirrors will follow once publish tokens are provisioned. The CDN
-> above is the canonical install channel today and fires anonymized adoption
-> telemetry back into the Observatory on every fetch.
+> **PyPI** — live at <https://pypi.org/project/dominion-observatory-sdk/0.1.0/>
+> **npm** — publish pending (npm Classic Automation Token required; CDN is the canonical TS install channel in the meantime).
 
 Two functions, identical semantics across both languages:
 

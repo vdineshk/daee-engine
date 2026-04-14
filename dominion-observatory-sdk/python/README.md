@@ -8,17 +8,22 @@ GitHub/registry signals.
 
 ## Install
 
-Single file, stdlib only (Python 3.9+). No pip, no package manager:
+**pip (recommended):**
+
+```bash
+pip install dominion-observatory-sdk
+```
+
+Live on PyPI: <https://pypi.org/project/dominion-observatory-sdk/0.1.0/>
+
+**CDN alternative (single file, stdlib only, Python 3.9+):**
 
 ```bash
 curl -O https://sdk-cdn.sgdata.workers.dev/v1/observatory.py
 ```
 
 Then drop `observatory.py` into your project and import from it directly.
-
-> A PyPI mirror will follow once the publish token is provisioned. The CDN is
-> the canonical install channel today and every fetch fires anonymized
-> adoption telemetry back into the Observatory.
+Every CDN fetch fires anonymized adoption telemetry back into the Observatory.
 
 ## Usage
 

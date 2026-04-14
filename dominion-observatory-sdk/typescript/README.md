@@ -22,8 +22,8 @@ Types available at the same URL base:
 /// <reference types="https://sdk-cdn.sgdata.workers.dev/v1/observatory.d.ts" />
 ```
 
-> An npm mirror will follow once the publish token is provisioned. The CDN is
-> the canonical install channel today and every fetch fires anonymized
+> **npm** — publish pending (npm Classic Automation Token required). The CDN is
+> the canonical install channel today; every fetch fires anonymized
 > adoption telemetry back into the Observatory.
 
 ## Usage
