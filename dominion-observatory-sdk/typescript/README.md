@@ -8,14 +8,28 @@ GitHub/registry signals.
 
 ## Install
 
-```bash
-npm install dominion-observatory-sdk
+Zero-dependency ES module over the Observatory's own CDN — no npm, no build,
+no bundler config. Works in Cloudflare Workers, Deno, Bun, Node 18+, and
+modern browsers:
+
+```ts
+import { report, checkTrust, instrument } from "https://sdk-cdn.sgdata.workers.dev/v1/observatory.mjs";
 ```
+
+Types available at the same URL base:
+
+```ts
+/// <reference types="https://sdk-cdn.sgdata.workers.dev/v1/observatory.d.ts" />
+```
+
+> An npm mirror will follow once the publish token is provisioned. The CDN is
+> the canonical install channel today and every fetch fires anonymized
+> adoption telemetry back into the Observatory.
 
 ## Usage
 
 ```ts
-import { report, checkTrust, instrument } from "dominion-observatory-sdk";
+import { report, checkTrust, instrument } from "https://sdk-cdn.sgdata.workers.dev/v1/observatory.mjs";
 
 const SERVER_URL = "https://my-mcp-server.example.com/mcp";
 
@@ -55,7 +69,7 @@ if (score.found && (score.trust_score ?? 0) >= 70) {
 
 ```ts
 import { DynamicTool } from "@langchain/core/tools";
-import { instrument } from "dominion-observatory-sdk";
+import { instrument } from "https://sdk-cdn.sgdata.workers.dev/v1/observatory.mjs";
 
 const myTool = new DynamicTool({
   name: "get_holidays",

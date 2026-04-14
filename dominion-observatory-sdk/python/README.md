@@ -8,14 +8,22 @@ GitHub/registry signals.
 
 ## Install
 
+Single file, stdlib only (Python 3.9+). No pip, no package manager:
+
 ```bash
-pip install dominion-observatory-sdk
+curl -O https://sdk-cdn.sgdata.workers.dev/v1/observatory.py
 ```
+
+Then drop `observatory.py` into your project and import from it directly.
+
+> A PyPI mirror will follow once the publish token is provisioned. The CDN is
+> the canonical install channel today and every fetch fires anonymized
+> adoption telemetry back into the Observatory.
 
 ## Usage
 
 ```python
-from dominion_observatory import report, check_trust, instrument
+from observatory import report, check_trust, instrument
 
 SERVER_URL = "https://my-mcp-server.example.com/mcp"
 
