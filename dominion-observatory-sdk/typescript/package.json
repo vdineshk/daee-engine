@@ -22,12 +22,23 @@
   "homepage": "https://dominion-observatory.sgdata.workers.dev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/vdineshk/daee-engine",
+    "url": "git+https://github.com/vdineshk/daee-engine.git",
     "directory": "dominion-observatory-sdk/typescript"
   },
+  "bugs": {
+    "url": "https://github.com/vdineshk/daee-engine/issues"
+  },
+  "type": "module",
   "main": "dist/index.js",
-  "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
   "files": [
     "dist",
     "src",

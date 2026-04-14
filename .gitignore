@@ -4,3 +4,8 @@ dist/
 *.log
 .vercel/
 .cache/
+.npmrc
+.pypirc
+.env
+.env.*
+!.env.example
