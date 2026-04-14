@@ -1,0 +1,46 @@
+{
+  "name": "dominion-observatory-sdk",
+  "version": "0.1.0",
+  "description": "Cross-ecosystem agent behavioral telemetry SDK — report and read trust scores from the Dominion Observatory. The only MCP scoring network that accepts agent-reported runtime data.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "observability",
+    "trust",
+    "telemetry",
+    "agents",
+    "langchain",
+    "autogen",
+    "crewai",
+    "ai-agents",
+    "compliance",
+    "eu-ai-act",
+    "imda"
+  ],
+  "license": "MIT",
+  "author": "Dominion / vdineshk",
+  "homepage": "https://dominion-observatory.sgdata.workers.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vdineshk/daee-engine",
+    "directory": "dominion-observatory-sdk/typescript"
+  },
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
