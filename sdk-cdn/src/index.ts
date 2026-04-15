@@ -84,7 +84,7 @@ function withHeaders(res: Response, contentType: string): Response {
   // happens on major version bumps.
   headers.set("Cache-Control", "public, max-age=3600, s-maxage=86400");
   headers.set("X-SDK", "dominion-observatory-sdk");
-  headers.set("X-SDK-Version", "0.1.0");
+  headers.set("X-SDK-Version", "0.2.0");
   headers.set(
     "X-Observatory",
     "https://dominion-observatory.sgdata.workers.dev"
@@ -105,7 +105,7 @@ export default {
         JSON.stringify({
           status: "ok",
           service: "sdk-cdn",
-          version: "0.1.0",
+          version: "0.2.0",
           sdk: "dominion-observatory-sdk",
           endpoints: Object.keys(ASSET_ROUTES),
           timestamp: new Date().toISOString(),
