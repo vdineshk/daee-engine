@@ -3,17 +3,36 @@
 One-line agent behavioral telemetry — the data collection flywheel of the
 [Dominion Observatory](https://dominion-observatory.sgdata.workers.dev).
 
-**Python — pip (recommended):**
+**Python — pip:**
 
 ```bash
 pip install dominion-observatory-sdk
+```
+
+**TypeScript / JS — npm:**
+
+```bash
+npm install dominion-observatory-sdk
 ```
 
 **TypeScript / JS — CDN (zero-install, works in Workers, Deno, Bun, Node 18+):**
 
 ```ts
 import { report, checkTrust, instrument } from "https://sdk-cdn.sgdata.workers.dev/v1/observatory.mjs";
+
+await report({
+  agent_id: "acme-scheduler@1.2.0",
+  server_url: "https://my-mcp.example.com/mcp",
+  success: true,
+  latency_ms: 142,
+  tool_name: "get_holidays",
+});
 ```
+
+> **Breaking change in 0.2.0:** `agent_id` is now required on every `report()`
+> and `instrument()` call. Missing, empty, or reserved values (`anonymous`,
+> `observatory_probe`) throw synchronously. See the per-language READMEs for
+> upgrade notes.
 
 **Python — CDN alternative (single file, stdlib only):**
 
@@ -26,10 +45,11 @@ Install page with copy-paste snippets: <https://sdk-cdn.sgdata.workers.dev>
 - [TypeScript source](./typescript)
 - [Python source](./python)
 
-> **PyPI** — live at <https://pypi.org/project/dominion-observatory-sdk/0.1.0/>
-> **npm** — publish pending (npm Classic Automation Token required; CDN is the canonical TS install channel in the meantime).
+> **PyPI** — live at <https://pypi.org/project/dominion-observatory-sdk/0.2.0/>
+> **npm** — live at <https://www.npmjs.com/package/dominion-observatory-sdk>
+> **CDN** — live at <https://sdk-cdn.sgdata.workers.dev/v1/observatory.mjs> (`X-SDK-Version: 0.2.0`)
 
-Two functions, identical semantics across both languages:
+Three functions, identical semantics across both languages:
 
 | Function     | What it does                                                            |
 | ------------ | ----------------------------------------------------------------------- |
@@ -58,9 +78,11 @@ resulting dataset cannot be backfilled — it is temporally non-replicable.
 
 ## Privacy and compliance
 
-Reports carry exactly five fields: `server_url`, `success`, `latency_ms`,
-`tool_name`, `http_status`. Nothing else. No query content, user identifiers,
-IP addresses, auth tokens, or tool outputs.
+Reports carry exactly six fields: `agent_id`, `server_url`, `success`,
+`latency_ms`, `tool_name`, `http_status`. Nothing else. No query content, user
+identifiers, IP addresses, auth tokens, or tool outputs. The `agent_id` is a
+caller-chosen stable string (package name or persisted UUID) and is the only
+identifier the Observatory stores for cross-ecosystem attribution.
 
 This satisfies:
 - **Singapore PDPA** — no personal data is transmitted.
