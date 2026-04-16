@@ -5,13 +5,29 @@
  *   - report(args): send anonymized interaction telemetry to the Observatory
  *   - checkTrust(serverUrl): fetch a server's behavioral trust score
  *
- * Privacy: reports carry ONLY {server_url, success, latency_ms, tool_name, http_status}.
- * No query content, user data, or IP addresses are collected.
+ * Privacy: reports carry ONLY
+ *   {agent_id, server_url, success, latency_ms, tool_name, http_status}.
+ * No query content, user data, prompts, or IP addresses are collected.
+ *
+ * About agent_id (REQUIRED as of 0.2.0):
+ *   - Identifies which agent/app is reporting, so the Observatory can tell
+ *     cross-ecosystem external telemetry apart from internal probes and
+ *     synthetic test traffic.
+ *   - Must be a stable, non-empty string. A random UUID, an npm package name,
+ *     or any opaque identifier you control all work.
+ *   - Do NOT use "anonymous" or "observatory_probe"; those values are
+ *     reserved for internal classification and will be filtered out of
+ *     cross-ecosystem external statistics.
  *
  * Use it from any MCP server, LangChain tool, AutoGen agent, or CrewAI worker to
  * contribute to — and read from — the cross-ecosystem agent behavioral trust network.
  */
 export interface ReportArgs {
+    /**
+     * REQUIRED. Stable identifier for the agent/app sending the report.
+     * Must not be empty, "anonymous", or "observatory_probe".
+     */
+    agent_id: string;
     /** Canonical URL of the MCP server the interaction happened on. */
     server_url: string;
     /** True if the tool call returned a non-error result. */
@@ -52,11 +68,9 @@ export interface ReportOptions {
     timeoutMs?: number;
 }
 /**
- * Fire-and-forget telemetry report. Never throws.
- *
- * The returned Promise resolves to true on HTTP 2xx, false otherwise.
- * In fire-and-forget usage you can simply ignore the return value — it will
- * never reject and never block your tool handler.
+ * Fire-and-forget telemetry report. Throws synchronously ONLY on invalid agent_id.
+ * Otherwise the returned Promise resolves to true on HTTP 2xx, false otherwise
+ * and never rejects — safe to ignore.
  */
 export declare function report(args: ReportArgs, options?: ReportOptions): Promise<boolean>;
 /**
@@ -68,9 +82,13 @@ export declare function checkTrust(serverUrl: string, options?: ReportOptions): 
  * Convenience wrapper that measures latency and reports it.
  * Use it to instrument a single tool handler with one line.
  *
- *   return instrument({server_url, tool_name}, async () => handleTool(args));
+ *   return instrument(
+ *     {agent_id: "my-langchain-agent", server_url, tool_name},
+ *     async () => handleTool(args),
+ *   );
  */
 export declare function instrument<T>(meta: {
+    agent_id: string;
     server_url: string;
     tool_name: string;
 }, run: () => Promise<T>, options?: ReportOptions): Promise<T>;

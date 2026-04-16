@@ -5,8 +5,19 @@ Two functions:
     - report(...): send anonymized interaction telemetry to the Observatory
     - check_trust(server_url): fetch a server's behavioral trust score
 
-Privacy: reports carry ONLY {server_url, success, latency_ms, tool_name, http_status}.
-No query content, user data, or IP addresses are collected.
+Privacy: reports carry ONLY
+    {agent_id, server_url, success, latency_ms, tool_name, http_status}.
+No query content, user data, prompts, or IP addresses are collected.
+
+About agent_id (REQUIRED as of 0.2.0):
+    - Identifies which agent/app is reporting, so the Observatory can tell
+      cross-ecosystem external telemetry apart from internal probes and
+      synthetic test traffic.
+    - Must be a stable, non-empty string. A random UUID, a package name,
+      or any opaque identifier you control all work.
+    - Do NOT use "anonymous" or "observatory_probe"; those values are
+      reserved for internal classification and will be filtered out of
+      cross-ecosystem external statistics.
 """
 
 from __future__ import annotations
@@ -16,13 +27,16 @@ import time
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, asdict
-from typing import Any, Awaitable, Callable, Optional, TypeVar
+from typing import Callable, Optional, TypeVar
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __all__ = ["report", "check_trust", "instrument", "TrustScore"]
 
 OBSERVATORY_MCP_URL = "https://dominion-observatory.sgdata.workers.dev/mcp"
 OBSERVATORY_API_URL = "https://dominion-observatory.sgdata.workers.dev/api"
+_USER_AGENT = f"dominion-observatory-sdk-python/{__version__}"
+
+_RESERVED_AGENT_IDS = {"anonymous", "observatory_probe", ""}
 
 _T = TypeVar("_T")
 
@@ -43,7 +57,23 @@ class TrustScore:
         return {k: v for k, v in asdict(self).items() if v is not None}
 
 
+def _validate_agent_id(agent_id: object) -> str:
+    if not isinstance(agent_id, str):
+        raise TypeError(
+            "dominion-observatory-sdk: agent_id is required and must be a string. "
+            "See https://dominion-observatory.sgdata.workers.dev for docs."
+        )
+    trimmed = agent_id.strip()
+    if trimmed in _RESERVED_AGENT_IDS:
+        raise ValueError(
+            f'dominion-observatory-sdk: agent_id "{trimmed}" is reserved or empty. '
+            "Pass a stable non-empty identifier (e.g. your package name or a UUID)."
+        )
+    return trimmed
+
+
 def report(
+    agent_id: str,
     server_url: str,
     success: bool,
     latency_ms: float,
@@ -54,10 +84,12 @@ def report(
     timeout: float = 2.0,
 ) -> bool:
     """
-    Fire-and-forget telemetry report. Never raises.
+    Fire-and-forget telemetry report. Raises only on invalid agent_id.
 
     Returns True on HTTP 2xx, False otherwise. Safe to ignore the return value.
     """
+    agent_id = _validate_agent_id(agent_id)
+
     if http_status is None:
         http_status = 200 if success else 500
 
@@ -68,6 +100,7 @@ def report(
         "params": {
             "name": "report_interaction",
             "arguments": {
+                "agent_id": agent_id,
                 "server_url": server_url,
                 "success": bool(success),
                 "latency_ms": max(0, int(round(latency_ms))),
@@ -81,7 +114,10 @@ def report(
     req = urllib.request.Request(
         endpoint,
         data=data,
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": _USER_AGENT,
+        },
         method="POST",
     )
     try:
@@ -102,8 +138,9 @@ def check_trust(
     Returns TrustScore(found=False, server_url=...) if the Observatory has no record.
     """
     url = f"{endpoint}/trust?url={urllib.parse.quote(server_url, safe='')}"
+    req = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             if not (200 <= resp.status < 300):
                 return TrustScore(found=False, server_url=server_url)
             body = json.loads(resp.read().decode("utf-8"))
@@ -124,6 +161,7 @@ def check_trust(
 
 
 def instrument(
+    agent_id: str,
     server_url: str,
     tool_name: str,
     run: Callable[[], _T],
@@ -134,12 +172,19 @@ def instrument(
     Convenience wrapper that measures latency and reports it.
 
     Usage:
-        result = instrument(SERVER_URL, "get_holidays", lambda: handle_tool(args))
+        result = instrument(
+            "my-langchain-agent",
+            SERVER_URL,
+            "get_holidays",
+            lambda: handle_tool(args),
+        )
     """
+    agent_id = _validate_agent_id(agent_id)
     start = time.time()
     try:
         result = run()
         report(
+            agent_id=agent_id,
             server_url=server_url,
             success=True,
             latency_ms=(time.time() - start) * 1000,
@@ -150,6 +195,7 @@ def instrument(
         return result
     except Exception:
         report(
+            agent_id=agent_id,
             server_url=server_url,
             success=False,
             latency_ms=(time.time() - start) * 1000,

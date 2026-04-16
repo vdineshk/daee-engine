@@ -5,8 +5,19 @@
  *   - report(args): send anonymized interaction telemetry to the Observatory
  *   - checkTrust(serverUrl): fetch a server's behavioral trust score
  *
- * Privacy: reports carry ONLY {server_url, success, latency_ms, tool_name, http_status}.
- * No query content, user data, or IP addresses are collected.
+ * Privacy: reports carry ONLY
+ *   {agent_id, server_url, success, latency_ms, tool_name, http_status}.
+ * No query content, user data, prompts, or IP addresses are collected.
+ *
+ * About agent_id (REQUIRED as of 0.2.0):
+ *   - Identifies which agent/app is reporting, so the Observatory can tell
+ *     cross-ecosystem external telemetry apart from internal probes and
+ *     synthetic test traffic.
+ *   - Must be a stable, non-empty string. A random UUID, an npm package name,
+ *     or any opaque identifier you control all work.
+ *   - Do NOT use "anonymous" or "observatory_probe"; those values are
+ *     reserved for internal classification and will be filtered out of
+ *     cross-ecosystem external statistics.
  *
  * Use it from any MCP server, LangChain tool, AutoGen agent, or CrewAI worker to
  * contribute to — and read from — the cross-ecosystem agent behavioral trust network.
@@ -15,7 +26,14 @@
 const OBSERVATORY_MCP_URL = "https://dominion-observatory.sgdata.workers.dev/mcp";
 const OBSERVATORY_API_URL = "https://dominion-observatory.sgdata.workers.dev/api";
 
+const RESERVED_AGENT_IDS = new Set(["anonymous", "observatory_probe", ""]);
+
 export interface ReportArgs {
+  /**
+   * REQUIRED. Stable identifier for the agent/app sending the report.
+   * Must not be empty, "anonymous", or "observatory_probe".
+   */
+  agent_id: string;
   /** Canonical URL of the MCP server the interaction happened on. */
   server_url: string;
   /** True if the tool call returned a non-error result. */
@@ -58,17 +76,34 @@ export interface ReportOptions {
   timeoutMs?: number;
 }
 
+function validateAgentId(agent_id: unknown): string {
+  if (typeof agent_id !== "string") {
+    throw new TypeError(
+      "dominion-observatory-sdk: agent_id is required and must be a string. " +
+        "See https://dominion-observatory.sgdata.workers.dev for docs."
+    );
+  }
+  const trimmed = agent_id.trim();
+  if (RESERVED_AGENT_IDS.has(trimmed)) {
+    throw new Error(
+      `dominion-observatory-sdk: agent_id "${trimmed}" is reserved or empty. ` +
+        "Pass a stable non-empty identifier (e.g. your package name or a UUID)."
+    );
+  }
+  return trimmed;
+}
+
 /**
- * Fire-and-forget telemetry report. Never throws.
- *
- * The returned Promise resolves to true on HTTP 2xx, false otherwise.
- * In fire-and-forget usage you can simply ignore the return value — it will
- * never reject and never block your tool handler.
+ * Fire-and-forget telemetry report. Throws synchronously ONLY on invalid agent_id.
+ * Otherwise the returned Promise resolves to true on HTTP 2xx, false otherwise
+ * and never rejects — safe to ignore.
  */
 export async function report(
   args: ReportArgs,
   options: ReportOptions = {}
 ): Promise<boolean> {
+  const agent_id = validateAgentId(args.agent_id);
+
   const endpoint = options.endpoint ?? OBSERVATORY_MCP_URL;
   const fetchImpl = options.fetch ?? (globalThis as any).fetch;
   const timeoutMs = options.timeoutMs ?? 2000;
@@ -89,6 +124,7 @@ export async function report(
         params: {
           name: "report_interaction",
           arguments: {
+            agent_id,
             server_url: args.server_url,
             success: args.success,
             latency_ms: Math.max(0, Math.round(args.latency_ms)),
@@ -140,19 +176,24 @@ export async function checkTrust(
  * Convenience wrapper that measures latency and reports it.
  * Use it to instrument a single tool handler with one line.
  *
- *   return instrument({server_url, tool_name}, async () => handleTool(args));
+ *   return instrument(
+ *     {agent_id: "my-langchain-agent", server_url, tool_name},
+ *     async () => handleTool(args),
+ *   );
  */
 export async function instrument<T>(
-  meta: { server_url: string; tool_name: string },
+  meta: { agent_id: string; server_url: string; tool_name: string },
   run: () => Promise<T>,
   options: ReportOptions = {}
 ): Promise<T> {
+  const agent_id = validateAgentId(meta.agent_id);
   const start = Date.now();
   try {
     const result = await run();
     // Fire-and-forget: do not await the report.
     void report(
       {
+        agent_id,
         server_url: meta.server_url,
         success: true,
         latency_ms: Date.now() - start,
@@ -165,6 +206,7 @@ export async function instrument<T>(
   } catch (err) {
     void report(
       {
+        agent_id,
         server_url: meta.server_url,
         success: false,
         latency_ms: Date.now() - start,

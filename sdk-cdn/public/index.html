@@ -20,11 +20,17 @@
 <h1>dominion-observatory-sdk</h1>
 <p class="muted">Cross-ecosystem agent behavioral telemetry. The only MCP scoring network that accepts agent-reported runtime data. <span class="tag">MIT</span> <span class="tag">no install</span> <span class="tag">zero deps</span></p>
 
+<h2>Breaking change in 0.2.0 — <code>agent_id</code> is required</h2>
+<p>Every <code>report()</code> and <code>instrument()</code> call must include a stable <code>agent_id</code> string. Missing, empty, or reserved values (<code>anonymous</code>, <code>observatory_probe</code>) throw synchronously. A package name or a persisted UUID both work. This is how the Observatory attributes cross-ecosystem demand to real external agents instead of lumping everything under one anonymous bucket.</p>
+
 <h2>TypeScript / JavaScript / Deno / Bun</h2>
 <pre><code>import { report, checkTrust, instrument } from "https://sdk-cdn.sgdata.workers.dev/v1/observatory.mjs";
 
+const AGENT_ID = "acme-scheduler@1.2.0"; // package name or persisted UUID
+
 // Fire-and-forget telemetry
 await report({
+  agent_id: AGENT_ID,
   server_url: "https://my-mcp-server.example.com/mcp",
   success: true,
   latency_ms: 142,
@@ -38,10 +44,12 @@ if (score.found && (score.trust_score ?? 0) >= 70) await callThatServer();</code
 <h2>Cloudflare Workers</h2>
 <pre><code>import { instrument } from "https://sdk-cdn.sgdata.workers.dev/v1/observatory.mjs";
 
+const AGENT_ID = "my-worker@1.0.0";
+
 export default {
   async fetch(request, env, ctx) {
     return instrument(
-      { server_url: SELF_URL, tool_name: "get_holidays" },
+      { agent_id: AGENT_ID, server_url: SELF_URL, tool_name: "get_holidays" },
       () => handleTool(request)
     );
   },
@@ -55,6 +63,7 @@ curl -O https://sdk-cdn.sgdata.workers.dev/v1/observatory.py
 from observatory import report, check_trust, instrument
 
 report(
+    agent_id="acme-scheduler@1.2.0",
     server_url="https://my-mcp-server.example.com/mcp",
     success=True,
     latency_ms=142,
@@ -67,7 +76,7 @@ report(
 </code></pre>
 
 <h2>What gets sent</h2>
-<p>Exactly five fields per report: <code>server_url</code>, <code>success</code>, <code>latency_ms</code>, <code>tool_name</code>, <code>http_status</code>. No query content, no user data, no IPs. Compatible with Singapore PDPA, IMDA Model AI Governance Framework, and EU AI Act Article 12 logging.</p>
+<p>Exactly six fields per report: <code>agent_id</code>, <code>server_url</code>, <code>success</code>, <code>latency_ms</code>, <code>tool_name</code>, <code>http_status</code>. No query content, no user data, no IPs. The <code>agent_id</code> is a caller-chosen stable identifier — the only field the Observatory uses for cross-ecosystem attribution. Compatible with Singapore PDPA, IMDA Model AI Governance Framework, and EU AI Act Article 12 logging.</p>
 
 <h2>Why agent-reported runtime?</h2>
 <p>Every other MCP scoring platform (Glama, Smithery, MCP Scorecard, Nerq, Zarq) scores servers from the outside using GitHub and registry metadata. Dominion Observatory is the only network that observes what happens when an agent actually calls a tool. Runtime data cannot be backfilled — it compounds temporally and is the strongest data moat in the ecosystem.</p>
@@ -80,6 +89,6 @@ report(
   <li><a href="/v1/observatory.mjs">v1/observatory.mjs</a> · <a href="/v1/observatory.d.ts">v1/observatory.d.ts</a> · <a href="/v1/observatory.py">v1/observatory.py</a></li>
 </ul>
 
-<p class="muted">Published via CDN Worker on Cloudflare free tier. An npm and PyPI mirror will follow once publish tokens are provisioned.</p>
+<p class="muted">Published via CDN Worker on Cloudflare free tier. Also live on <a href="https://www.npmjs.com/package/dominion-observatory-sdk">npm</a> and <a href="https://pypi.org/project/dominion-observatory-sdk/">PyPI</a> (both at 0.2.0).</p>
 </body>
 </html>
