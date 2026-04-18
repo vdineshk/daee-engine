@@ -14,7 +14,7 @@ GitHub/registry signals.
 pip install dominion-observatory-sdk
 ```
 
-Live on PyPI: <https://pypi.org/project/dominion-observatory-sdk/0.1.0/>
+Live on PyPI: <https://pypi.org/project/dominion-observatory-sdk/>
 
 **CDN alternative (single file, stdlib only, Python 3.9+):**
 
@@ -75,6 +75,33 @@ agent-reported, cross-ecosystem runtime behavior — the only data that ages int
 compounding value because it can't be backfilled.
 
 Every install of this SDK is a permanent telemetry pipeline.
+
+## LangChain integration (v0.2.0)
+
+Drop-in `BaseCallbackHandler` that reads Observatory trust scores before every
+tool call and reports anonymized telemetry after. Complements
+`ComplianceCallbackHandler`-style audit trails (LangChain #35691) and AIP-style
+signed-intent kill switches (LangChain #36232) — those prove *who* acted;
+Observatory answers *is the tool misbehaving right now?*
+
+```python
+from langchain.agents import AgentExecutor
+from dominion_observatory.langchain import ObservatoryTrustCallbackHandler
+
+handler = ObservatoryTrustCallbackHandler(
+    tool_server_urls={
+        "web_search":    "https://search.example.com/mcp",
+        "transfer_funds":"https://payments.example.com/mcp",
+    },
+    min_trust_score=40.0,
+    block_on_low_trust=True,
+)
+
+agent = AgentExecutor(..., callbacks=[handler])
+```
+
+Requires `langchain-core>=0.3`. Install separately; the base SDK has zero
+runtime dependencies.
 
 ## Observatory API
 
