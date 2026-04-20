@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dominion-observatory-sdk"
-version = "0.1.0"
+version = "0.2.0"
 description = "Cross-ecosystem agent behavioral telemetry SDK — report and read trust scores from the Dominion Observatory. The only MCP scoring network that accepts agent-reported runtime data."
 readme = "README.md"
 license = { text = "MIT" }
