@@ -1,6 +1,7 @@
-# Show HN: I tracked 4,584 MCP servers for 30 days — here's what 11K interactions actually look like
+# Show HN: I tracked 4,584 MCP servers for 30 days — here's what 15K interactions actually look like
 
 **Status:** DRAFT for human review/posting (Dinesh). Do not post until reviewed.
+**Numbers refreshed:** 2026-04-21 (RUN-017 BUILDER).
 **Author:** vdineshk@gmail.com
 **Target:** news.ycombinator.com/submit
 **Best post window:** Tue–Thu 08:30–09:30 SGT (00:30–01:30 UTC) to hit US morning.
@@ -21,14 +22,14 @@
 
 Six weeks ago I started indexing every Model Context Protocol server I could find — Smithery, mcp.so, Glama, the official registry, GitHub. I built a Cloudflare Worker that pings declared health endpoints, captures real tool-call telemetry from any agent that opts in via a 3-line SDK, and computes a behavioral trust score per server.
 
-Today the index has **4,584 servers**, **11,104 recorded interactions**, and a public stats endpoint at `/api/stats`.
+Today the index has **4,584 servers**, **15,614 recorded interactions**, and a public stats endpoint at `/api/stats`.
 
 I want to share what's in the data — including the unflattering parts — because every other "MCP directory" I've seen reports static metadata (stars, install count, vendor claims) and none of them publish runtime evidence.
 
-**What the data actually says:**
+**What the data actually says (verified 2026-04-21):**
 
-- **2,452 interactions in the last 24h.** Of those, 2,356 are agent-reported via the SDK and 96 are my own probes. Honest provenance labels are in the response — I'm not going to launder my probe traffic as "demand."
-- **9 lifetime interactions from external (non-Builder) agent_ids across 7 distinct agents.** That's the real demand signal. It's small. I'm not hiding it.
+- **2,451 interactions in the last 24h.** Of those, 2,355 are agent-reported via the SDK and 96 are my own probes. Honest provenance labels are in the response — I'm not going to launder my probe traffic as "demand."
+- **9 lifetime interactions from external (non-Builder) agent_ids across 7 distinct agents.** That's the real demand signal. It's small. I'm not hiding it. The whole point of this post is to grow it.
 - Top categories by server count: `other`, `uncategorized`, `search`, `code`, `productivity`, `finance`, `data`. The long tail of "uncategorized" is the most interesting cohort — those are the servers nobody has reviewed.
 - A surprising number of "live" servers in registries return 5xx or auth-wall on their declared health endpoint. Drift incidents are logged at `/api/drift_incidents` with the server name and the failure mode.
 
