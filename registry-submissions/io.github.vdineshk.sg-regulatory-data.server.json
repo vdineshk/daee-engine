@@ -1,0 +1,19 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.vdineshk/sg-regulatory-data",
+  "title": "Singapore Regulatory Data",
+  "description": "Live Singapore regulatory references: MAS rules, IMDA guidance, PDPA. Free tier.",
+  "version": "1.1.0",
+  "repository": {
+    "url": "https://github.com/vdineshk/daee-engine",
+    "source": "github",
+    "subfolder": "sg-regulatory-data-mcp"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://sg-regulatory-data-mcp.sgdata.workers.dev/mcp"
+    }
+  ],
+  "websiteUrl": "https://dominion-observatory.sgdata.workers.dev/server/sg-regulatory-data-mcp.sgdata.workers.dev/mcp"
+}
