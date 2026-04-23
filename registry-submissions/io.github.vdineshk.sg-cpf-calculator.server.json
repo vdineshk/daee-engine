@@ -1,0 +1,19 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.vdineshk/sg-cpf-calculator",
+  "title": "Singapore CPF Calculator",
+  "description": "Singapore CPF contribution calculator for AI agents. PDPA-compliant, free tier.",
+  "version": "1.1.0",
+  "repository": {
+    "url": "https://github.com/vdineshk/daee-engine",
+    "source": "github",
+    "subfolder": "sg-cpf-calculator-mcp"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://sg-cpf-calculator-mcp.sgdata.workers.dev/mcp"
+    }
+  ],
+  "websiteUrl": "https://dominion-observatory.sgdata.workers.dev/server/sg-cpf-calculator-mcp.sgdata.workers.dev/mcp"
+}

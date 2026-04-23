@@ -1,0 +1,19 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.vdineshk/sg-company-lookup",
+  "title": "Singapore Company Lookup",
+  "description": "Singapore company lookup via ACRA-derived references for AI agents. Free tier.",
+  "version": "1.1.0",
+  "repository": {
+    "url": "https://github.com/vdineshk/daee-engine",
+    "source": "github",
+    "subfolder": "sg-company-lookup-mcp"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://sg-company-lookup-mcp.sgdata.workers.dev/mcp"
+    }
+  ],
+  "websiteUrl": "https://dominion-observatory.sgdata.workers.dev/server/sg-company-lookup-mcp.sgdata.workers.dev/mcp"
+}
