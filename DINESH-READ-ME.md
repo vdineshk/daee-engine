@@ -7,13 +7,13 @@
 
 ## 1. STATUS IN ONE LINE
 
-**RUN-018 pre-commitment fired this run. Builder has executed a full strategy redesign — pivot from "content + registries → agent discovery" (which produced 0 organic calls in 19 days) to "sell the dataset to compliance/audit/registry buyers" (Option C). HN gate is DE-PRIORITIZED. Read the four-part brief in `decisions/2026-04-25-run-021-redesign-brief-part{1..4}-*.md`. This week your single highest-leverage action is no longer the HN post — it is reading and either ratifying or rejecting Option C.**
+**RUN-018 pre-commitment fired and a redesign brief was written, but Builder OVERCORRECTED to a B2B-human pivot. CEO rescinded mid-run. Corrected axis: stay on the empire's agent-to-agent thesis; build x402 / Stripe MPP payment rails INTO the Observatory itself so agent revenue is captured the moment agent traffic arrives. The HN draft remains de-prioritized. The Option-C cold-email plan is dead. New pre-commitments below.**
 
 ---
 
-## 2. THE REDESIGN IN ONE PARAGRAPH
+## 2. THE CORRECTED DIRECTION IN ONE PARAGRAPH
 
-19 days, 0 organic Observatory calls, across 3 long-form posts + 9 LangChain PRs + 4 registries + 2 SDK packages. The agent-discovery flywheel we positioned in front of does not yet exist at our volume; we built a measurement infrastructure for traffic that isn't coming yet. The asset we actually have is the **dataset** (4,584 servers × 25,641 rows × 17 days of behavioral baselines). Sell that, to humans who exist (compliance vendors, audit firms, MCP registries), in S$200 / S$2,000 monthly tiers. 5 enterprise pilots = S$10K/mo (the Month-12 target). Cold-email outreach motion, not content marketing. Existing infrastructure stays; new content/registry/PR investment STOPS until a paying customer validates the thesis. Full kill criteria at D47 (2026-05-23).
+19 days, 0 organic Observatory calls, across 3 long-form posts + 9 LangChain PRs + 4 registries + 2 SDK packages. The agent-discovery flywheel positioned at the front of the empire does not yet spin at our volume — but the answer is NOT to pivot off the flywheel. The answer is to **arm the flywheel with the payment rails it will need the moment it spins**: x402-priced premium endpoints on the Observatory (`/agent-query/{server-name}` etc.), an x402-aware Cloudflare Worker route that returns 402-Payment-Required with a quote and unlocks the trust verdict on payment receipt, end-to-end self-tested by the Builder's own flywheel-keeper as the test agent. Buyer is software. Payment rail is x402 / Stripe MPP / AP2. No human procurement path. Three monetization shapes (AGT-α x402-priced endpoints, AGT-β trust-aware MCP router, AGT-γ subscription-attestation feed) — Builder specs and recommends in RUN-022; CEO ratifies. The S$10K/mo target is a function of agents paying agents through the Observatory. Existing infrastructure (SDK, 8 servers, registry listings) is the substrate for the rail, not a sales surface.
 
 ---
 
@@ -55,32 +55,25 @@ No new servers. No new content pieces. No new registry submissions. Hard 14-day 
 
 ## 5. WHAT YOU NEED TO DO IN THE NEXT 7 DAYS — IN PRIORITY ORDER
 
-### Action A (≤30 min, this weekend) — **READ AND DECIDE ON THE REDESIGN**
+### Action A (≤10 min, anytime D20-D22) — **RATIFY OR REDIRECT THE CORRECTED AXIS**
 
-The single most valuable thing you can do this week is read the four-part redesign brief and either ratify or reject it. The Builder cannot proceed with cold-email outreach in your name without your explicit OK on the buyer narrative.
+CEO override happened this run; corrected axis is x402 / agent-to-agent rails on the Observatory. Builder needs your sign-off on which monetization shape to engineer first:
 
-1. Read in order:
-   - `decisions/2026-04-25-run-021-redesign-brief-part1-assessment.md` (~5 min)
-   - `decisions/2026-04-25-run-021-redesign-brief-part2-false-assumptions.md` (~7 min)
-   - `decisions/2026-04-25-run-021-redesign-brief-part3-architectures.md` (~10 min)
-   - `decisions/2026-04-25-run-021-redesign-brief-part4-recommendation.md` (~5 min)
-   - `benchmarks/sample-report-2026-04.md` (~5 min — this is the artifact you'd send buyers)
-2. Decide: ratify Option C / push for Option A or B / stop the pivot entirely.
-3. Confirm in DAEE-Decisions Notion or by replying to the daily report.
+- **AGT-α** — x402-priced premium endpoints (e.g. `/agent-query/{server-name}`). Per-call micropayment. Lowest engineering complexity.
+- **AGT-β** — Observatory as trust-aware MCP router. Agent calls `/route/{tool-name}`; Observatory picks the highest-trust server + attaches attestation + forwards. Highest revenue-capture per call.
+- **AGT-γ** — subscription-attestation feed for registry-side agents. x402 micropayments per unit-time. Closest to the parked Payment Rail Convergence Oracle thesis.
 
-If you do not respond by D22 (2026-04-28, Tue), Builder will proceed on Option C as the working assumption and continue building the engineering for it (per P-021B). Your silence = ratification.
+All three share a Cloudflare-Worker x402 implementation. RUN-022 will spec the chosen shape; you ratify or redirect.
+
+**To ratify or redirect:** comment on draft PR #11 (https://github.com/vdineshk/daee-engine/pull/11), add a row to DAEE-Decisions, or reply to the daily-report email when it lands. Pick one of α/β/γ or say "Builder picks." Default if silent by D22 (2026-04-28 Tue): Builder picks AGT-α as the lowest-complexity starting shape and engineers it; subsequent shapes follow.
 
 ### Action B (no action — explicit de-prioritization) — HN POST
 
-The HN Show HN draft (`content/hn-show-hn-dominion-observatory.md`) is **explicitly de-prioritized this week**. Reasoning: even if it hits front page, the funnel from "HN reader" to "agent calls Observatory" is the same funnel that produced 0 calls in 19 days. Posting HN now would dilute the redesign focus and re-cement the assumption Part 1 of the brief just disproved. The draft stays in repo as an asset; do not post until Option C validates a buyer narrative we'd want HN to amplify. (At that point: post HN with the *paid customer's* benchmark page as the wedge.)
+The HN Show HN draft (`content/hn-show-hn-dominion-observatory.md`) remains de-prioritized. The CEO override does not unlock content investment; pre-commitment P-021D still bars new content / registry / SDK-ecosystem-PR investment until first agent-to-agent payment is received. Different reason than yesterday's framing (was: "Option C must validate first"; now: "the empire's thesis says agent rails are the path; HN is human-channel and orthogonal").
 
-### Action C (5 min, anytime D20-D26) — REVIEW THE SAMPLE REPORT FOR FACTUAL ERRORS
+### Action C (no action — Builder handles it) — RAIL ENGINEERING
 
-`benchmarks/sample-report-2026-04.md` is the artifact Builder will reference in cold emails next week. Skim for any number you know to be wrong (especially around the SG-server descriptions in §5). Edit directly in repo or flag in DAEE-Decisions.
-
-### Action D (deferred to RUN-022, no action this week) — COLD-EMAIL BATCH
-
-Per pre-commitment P-021B, by D26 (2026-05-02) Builder will produce three drafted cold emails ready for you to send: one to a named compliance vendor, one to an audit-firm partner, one to an MCP-registry maintainer. Each will include EXACT 30-second copy-paste instructions. You will not need to compose anything.
+RUN-022 onward Builder builds the x402 Cloudflare-Worker rail end-to-end. No human-gated steps in the critical path. The flywheel-keeper acts as the test agent for end-to-end validation (we don't need external agent traffic to prove the rail works; we just need it to BE there when external traffic arrives).
 
 ---
 
@@ -97,14 +90,15 @@ If any of the engineering hits a streaming timeout, v4.1 incremental commits gua
 
 ---
 
-## 7. THE FOUR PRE-COMMITMENTS (kill criteria, mechanically enforced by future runs)
+## 7. PRE-COMMITMENTS — REVISED AFTER CEO OVERRIDE (kill criteria, mechanically enforced)
 
 | Tag | Trigger | Pass condition | Fail action |
 |---|---|---|---|
-| P-021A | RUN-021 | Sample report committed | (satisfied this run) |
-| P-021B | D26 (2026-05-02) | /benchmark endpoint live + /dataset page live + 3 cold emails drafted | Builder escalates that engineering window failed |
-| P-021C | D47 (2026-05-23) | ≥1 booked exploratory call OR ≥1 paid pilot signed | KILL Option C, escalate for full strategic reset (may include sunsetting Observatory direction) |
-| P-021D | RUN-021 forward | No new content / registry / PR investment until P-021C resolves | Override only if `external_24h` rises above 5 organically |
+| P-021A | RUN-021 | Sample report committed | (satisfied this run; artifact stands as audit material though tier-pricing section needs replacement) |
+| **P-021B-rev** | D26 (2026-05-02) | x402-aware Worker route on Observatory live + flywheel-keeper end-to-end self-test passing + AGT-α/β/γ spec at `decisions/2026-04-26-run-022-AGT-rails-spec.md` | If x402 client libs/standards aren't stable, reroute to Stripe MPP fallback; do NOT cancel |
+| **P-021C-rev** | D62 (2026-06-08) | ≥1 inbound agent-to-agent payment received from any non-Builder agent_id | Escalate to CEO with empire-timing-thesis question; no unilateral pivot |
+| P-021D | RUN-021 forward | No new content / registry / SDK-PR investment until first agent-to-agent payment received | Override only if `external_24h` rises above 5 organically |
+| **P-021E** (new) | All future runs | Builder will not propose any human-buyer motion. Buyer is always software. | If proposed in error: same-run rescission like RUN-021 |
 
 ---
 
