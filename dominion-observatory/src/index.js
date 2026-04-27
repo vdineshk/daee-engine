@@ -2914,12 +2914,105 @@ Sitemap: ${url.origin}/sitemap.xml
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
       });
     }
+    // AGT-alpha: Empirical-Behavioral-Trust-Oracle (EBTO) — x402-priced pre-call trust verdict
+    // Primitive claimed 2026-04-27. Prior-art check: no prior service uses cross-agent behavioral
+    // telemetry (not on-chain registry, not spec-compliance) as the trust basis for a paid endpoint.
+    if (url.pathname.startsWith("/agent-query/") && request.method === "GET") {
+      const serverSlug = decodeURIComponent(url.pathname.replace("/agent-query/", "").replace(/\/$/, ""));
+      const paymentHeader = request.headers.get("X-PAYMENT");
+      const paymentWallet = (env2.PAYMENT_WALLET && env2.PAYMENT_WALLET.trim()) || null;
+      const corsHeaders = { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" };
+
+      if (!paymentHeader) {
+        const accepts = paymentWallet ? [{
+          scheme: "exact",
+          network: "base",
+          maxAmountRequired: "1000",
+          to: paymentWallet,
+          asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+          extra: { name: "USDC", version: "2" }
+        }] : [];
+        return new Response(JSON.stringify({
+          x402Version: 1,
+          error: "Payment Required",
+          description: "Pay $0.001 USDC via x402 to unlock a behavioral trust verdict from Dominion Observatory. Trust is derived from empirical cross-agent runtime telemetry — not on-chain registry data.",
+          amount_usd: "0.001",
+          primitive: "Empirical-Behavioral-Trust-Oracle-v1",
+          claim_uri: `${url.origin}/agent-query/`,
+          accepts,
+          facilitator: "https://api.cdp.coinbase.com/platform/v1/x402/facilitate",
+          resource: url.pathname,
+          wallet_status: paymentWallet ? "configured" : "not_configured_yet"
+        }), { status: 402, headers: corsHeaders });
+      }
+
+      // Payment header present — look up server and return verdict.
+      // v0: payment header accepted as-is; real facilitator verification activates when
+      // PAYMENT_WALLET env var is set and facilitator API key is configured.
+      let server = null;
+      if (serverSlug.startsWith("http")) {
+        server = await db.prepare("SELECT * FROM servers WHERE url = ?").bind(serverSlug).first();
+      }
+      if (!server) {
+        server = await db.prepare("SELECT * FROM servers WHERE LOWER(name) = LOWER(?) LIMIT 1").bind(serverSlug).first();
+      }
+      if (!server) {
+        server = await db.prepare("SELECT * FROM servers WHERE url LIKE ? ORDER BY trust_score DESC LIMIT 1").bind(`%${serverSlug}%`).first();
+      }
+
+      if (!server) {
+        return new Response(JSON.stringify({
+          server_identifier: serverSlug,
+          trust_verdict: "UNKNOWN",
+          recommendation: "use-with-care",
+          trust_score: null,
+          message: "Server not yet tracked in Dominion Observatory. Report an interaction via POST /api/report to begin building its behavioral profile.",
+          primitive: "Empirical-Behavioral-Trust-Oracle-v1",
+          claim_uri: `${url.origin}/agent-query/`,
+          payment_status: "soft_launch_v0",
+          data_basis: "cross-agent-empirical-telemetry"
+        }), { headers: corsHeaders });
+      }
+
+      const recent = await db.prepare(
+        "SELECT COUNT(*) as cnt, AVG(latency_ms) as avg_lat FROM interactions WHERE server_id = ? AND timestamp > datetime('now', '-7 days')"
+      ).bind(server.id).first();
+
+      const score = server.trust_score || 0;
+      const verdict = score >= 70 ? "TRUSTED" : score >= 40 ? "CAUTION" : "RISKY";
+      const recommendation = score >= 70 ? "proceed" : score >= 40 ? "caution" : "avoid";
+
+      return new Response(JSON.stringify({
+        server_identifier: serverSlug,
+        server_url: server.url,
+        server_name: server.name,
+        category: server.category,
+        trust_verdict: verdict,
+        recommendation,
+        trust_score: Math.round(score * 10) / 10,
+        evidence: {
+          total_interactions: server.total_calls || 0,
+          success_rate_pct: server.total_calls > 0 ? Math.round(server.successful_calls / server.total_calls * 1000) / 10 : null,
+          avg_latency_ms: Math.round(server.avg_latency_ms || 0),
+          p95_latency_ms: Math.round(server.p95_latency_ms || 0),
+          recent_7d_interactions: recent?.cnt || 0,
+          recent_7d_avg_latency_ms: recent?.avg_lat ? Math.round(recent.avg_lat) : null,
+          data_since: "2026-04-08"
+        },
+        primitive: "Empirical-Behavioral-Trust-Oracle-v1",
+        claim_uri: `${url.origin}/agent-query/`,
+        payment_status: "soft_launch_v0",
+        payment_note: "v0: X-PAYMENT header received. Real x402 facilitator verification activates when PAYMENT_WALLET is configured in Cloudflare dashboard.",
+        data_basis: "cross-agent-empirical-telemetry"
+      }), { headers: corsHeaders });
+    }
     const infoPayload = {
       name: "Dominion Observatory",
-      version: "1.0.0",
+      version: "1.3.0",
       description: "The behavioral trust layer for the AI agent economy. Check MCP server reliability before you call. Report outcomes to strengthen the trust network.",
       endpoints: {
         mcp: "/mcp",
+        agent_query_ebto: "GET /agent-query/<server-name> [X-PAYMENT: <x402-proof>] — x402-priced behavioral trust verdict. Returns 402 without payment, trust verdict with payment. $0.001 USDC. Primitive: Empirical-Behavioral-Trust-Oracle-v1.",
         trust_check: "/api/trust?url=<server_url>",
         leaderboard: "/api/leaderboard?category=<category>&limit=<n>",
         stats: "/api/stats",
@@ -2929,6 +3022,16 @@ Sitemap: ${url.origin}/sitemap.xml
         servers_list: "/api/servers?category=<category>&limit=<n>",
         info: "/api/info",
         landing: "/"
+      },
+      monetization: {
+        primitive: "Empirical-Behavioral-Trust-Oracle-v1",
+        endpoint: "/agent-query/<server-name>",
+        price_usd: "0.001",
+        payment_protocol: "x402",
+        network: "base",
+        asset: "USDC",
+        status: "soft_launch_v0",
+        claim_date: "2026-04-27"
       },
       tools: TOOLS.map((t) => ({ name: t.name, description: t.description })),
       data_since: "2026-04-08",

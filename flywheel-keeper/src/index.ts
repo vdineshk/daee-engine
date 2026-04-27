@@ -109,6 +109,10 @@ interface KeeperState {
   last_tool_server: Server | "";
   last_tool_ok: boolean;
   last_tool_latency_ms: number;
+  last_ebto_at?: string;
+  last_ebto_402_ok?: boolean;
+  last_ebto_verdict?: string;
+  last_ebto_trust_score?: number | null;
   last_error?: string;
 }
 
@@ -246,6 +250,63 @@ async function probeTool(
   }
 }
 
+// Probe the EBTO /agent-query/{server} endpoint.
+// Tests two flows: (1) without X-PAYMENT → must return 402, (2) with X-PAYMENT → must return verdict.
+// This is the P-021B-rev end-to-end self-test; flywheel-keeper acts as the test agent.
+async function probeEBTO(env: Env, server: Server): Promise<{
+  flow402Ok: boolean;
+  verdictOk: boolean;
+  verdict: string | null;
+  trustScore: number | null;
+  latencyMs: number;
+}> {
+  const start = Date.now();
+  let flow402Ok = false;
+  let verdictOk = false;
+  let verdict: string | null = null;
+  let trustScore: number | null = null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TOOL_TIMEOUT_MS);
+  try {
+    // Flow 1: no payment → expect 402
+    const res402 = await env.OBSERVATORY.fetch(
+      `https://internal/agent-query/${server}`,
+      { method: "GET", signal: controller.signal }
+    );
+    flow402Ok = res402.status === 402;
+
+    // Flow 2: with payment header → expect trust verdict
+    const controller2 = new AbortController();
+    const timer2 = setTimeout(() => controller2.abort(), TOOL_TIMEOUT_MS);
+    try {
+      const resPaid = await env.OBSERVATORY.fetch(
+        `https://internal/agent-query/${server}`,
+        {
+          method: "GET",
+          headers: { "X-PAYMENT": "keeper-test-v0" },
+          signal: controller2.signal,
+        }
+      );
+      if (resPaid.ok) {
+        const body = (await resPaid.json()) as {
+          trust_verdict?: string;
+          trust_score?: number | null;
+        };
+        verdict = body.trust_verdict ?? null;
+        trustScore = body.trust_score ?? null;
+        verdictOk = !!verdict;
+      }
+    } finally {
+      clearTimeout(timer2);
+    }
+  } catch {
+    // Fire-and-forget; state logged in KeeperState.
+  } finally {
+    clearTimeout(timer);
+  }
+  return { flow402Ok, verdictOk, verdict, trustScore, latencyMs: Date.now() - start };
+}
+
 async function runTick(env: Env): Promise<KeeperState> {
   const now = new Date();
   let tickCount = 0;
@@ -303,6 +364,20 @@ async function runTick(env: Env): Promise<KeeperState> {
     lastToolLatency = probe.latency;
   }
 
+  // Every 24th tick (~every 2 hours): probe the EBTO /agent-query endpoint.
+  // P-021B-rev self-test: keeper acts as the test agent for end-to-end x402 validation.
+  let lastEbtoAt: string | undefined;
+  let lastEbto402Ok: boolean | undefined;
+  let lastEbtoVerdict: string | undefined;
+  let lastEbtoTrustScore: number | null | undefined;
+  if (tickCount % 24 === 0) {
+    const ebto = await probeEBTO(env, "sg-regulatory-data-mcp");
+    lastEbtoAt = now.toISOString();
+    lastEbto402Ok = ebto.flow402Ok;
+    lastEbtoVerdict = ebto.verdict ?? undefined;
+    lastEbtoTrustScore = ebto.trustScore;
+  }
+
   const state: KeeperState = {
     tick_count: tickCount,
     last_tick_at: now.toISOString(),
@@ -311,6 +386,12 @@ async function runTick(env: Env): Promise<KeeperState> {
     last_tool_server: lastToolServer,
     last_tool_ok: lastToolOk,
     last_tool_latency_ms: lastToolLatency,
+    ...(lastEbtoAt !== undefined && {
+      last_ebto_at: lastEbtoAt,
+      last_ebto_402_ok: lastEbto402Ok,
+      last_ebto_verdict: lastEbtoVerdict,
+      last_ebto_trust_score: lastEbtoTrustScore,
+    }),
   };
 
   if (env.KEEPER_STATE) {
@@ -333,10 +414,11 @@ export default {
         JSON.stringify({
           status: "ok",
           service: "flywheel-keeper",
-          version: "1.0.0",
+          version: "1.1.0",
           timestamp: new Date().toISOString(),
           cron: "*/5 * * * *",
           servers_probed: SERVERS.length,
+          ebto_probe: "active (every 24th tick ~2h)",
         }),
         { headers: { "Content-Type": "application/json" } }
       );

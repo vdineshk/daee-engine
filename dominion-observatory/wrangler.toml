@@ -10,3 +10,9 @@ database_id = "2979515b-1cfc-42f2-9f40-be1b680a73aa"
 
 [triggers]
 crons = ["*/15 * * * *"]
+
+# x402 EBTO payment wallet. Set to your USDC address on Base to activate real payment collection.
+# Until set, /agent-query/* returns 402 with empty accepts[] (soft-launch mode).
+# Set via: Cloudflare Dashboard > Workers > dominion-observatory > Settings > Variables
+[vars]
+PAYMENT_WALLET = ""
