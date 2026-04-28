@@ -144,3 +144,16 @@ Done. Enables flywheel-keeper HMAC self-test.
 ---
 
 *— DAEE-BUILDER v4.5, post-RUN-022 correction, branch `claude/amazing-cannon-iq0w2`*
+
+---
+
+## Appendix: Error log (this correction run)
+
+**Category 1 error (transient):**
+- Notion `update_content` on Brain NOVELTY LEDGER timed out (60s) on first attempt
+- Retried once after 10s — succeeded
+- Per v4.3 Category 1 protocol: one retry permitted, did not escalate to Category 2
+
+**Category 2 errors:** 0
+**Category 3 errors:** 0
+**Category 4 errors:** 0
