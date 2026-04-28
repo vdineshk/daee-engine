@@ -2011,6 +2011,130 @@ async function handleMCPRequest(request, db) {
   }
 }
 __name(handleMCPRequest, "handleMCPRequest");
+
+// AGT-ALPHA-V1: x402-gated trust verdict endpoint
+// Proof format: "hmac-sha256:base64:<timestamp_unix_minute>:<hmac_b64>"
+// HMAC-SHA256(INTERNAL_AGENT_SECRET, "agent-query:" + serverSlug + ":" + timestamp_minute)
+async function verifyPaymentProof(proof, serverSlug, env2) {
+  const secret = env2?.INTERNAL_AGENT_SECRET;
+  if (!secret) {
+    return { valid: false, reason: "payment rail not configured (INTERNAL_AGENT_SECRET missing)" };
+  }
+  try {
+    const parts = proof.split(":");
+    if (parts.length < 4 || parts[0] !== "hmac-sha256" || parts[1] !== "base64") {
+      return { valid: false, reason: "malformed proof format — expected hmac-sha256:base64:<minute>:<sig>" };
+    }
+    const proofMinute = parseInt(parts[2], 10);
+    const proofSig = parts[3];
+    if (isNaN(proofMinute)) return { valid: false, reason: "invalid timestamp in proof" };
+    const nowMinute = Math.floor(Date.now() / 60000);
+    if (Math.abs(nowMinute - proofMinute) > 2) {
+      return { valid: false, reason: "proof expired (outside ±2 minute window)" };
+    }
+    const keyMaterial = await crypto.subtle.importKey(
+      "raw", new TextEncoder().encode(secret),
+      { name: "HMAC", hash: "SHA-256" }, false, ["verify"]
+    );
+    const message = new TextEncoder().encode(`agent-query:${serverSlug}:${proofMinute}`);
+    const sigBytes = Uint8Array.from(atob(proofSig), (c) => c.charCodeAt(0));
+    const valid = await crypto.subtle.verify("HMAC", keyMaterial, sigBytes, message);
+    return {
+      valid,
+      reason: valid ? null : "signature mismatch",
+      ref: `agt-alpha-${proofMinute}-${serverSlug.slice(0, 24)}`
+    };
+  } catch (e) {
+    return { valid: false, reason: "proof verification error: " + e.message };
+  }
+}
+__name(verifyPaymentProof, "verifyPaymentProof");
+
+async function handleAgentQuery(request, db, serverSlug, url, env2) {
+  const agentId = request.headers.get("X-Agent-Id") || "anonymous";
+  const paymentProof = request.headers.get("X-Payment-Proof");
+  const PRICE_USD = "0.001";
+  const quoteId = crypto.randomUUID();
+  const quoteExpires = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+
+  if (!paymentProof) {
+    return new Response(JSON.stringify({
+      error: "Payment Required",
+      primitive: "AGT-ALPHA-V1",
+      claim_uri: "https://dominion-observatory.sgdata.workers.dev/api/agent-query",
+      quote: {
+        price_usd: PRICE_USD,
+        currency: "USD",
+        description: `Structured trust verdict for MCP server: ${serverSlug}`,
+        payment_rail: "x402",
+        fallback_rail: "stripe-mpp",
+        payment_proof_header: "X-Payment-Proof",
+        proof_format: "hmac-sha256:base64:<timestamp_unix_minute>:<hmac_b64>",
+        signing_algo: "HMAC-SHA256(INTERNAL_AGENT_SECRET, 'agent-query:' + server_slug + ':' + timestamp_minute)",
+        quote_id: quoteId,
+        quote_expires_at: quoteExpires,
+        info_url: `${url.origin}/api/payment-info`
+      }
+    }), {
+      status: 402,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "X-Payment-Required": "x402",
+        "X-Payment-Price-USD": PRICE_USD,
+        "X-Payment-Currency": "USD",
+        "X-Payment-Quote-ID": quoteId
+      }
+    });
+  }
+
+  const proofResult = await verifyPaymentProof(paymentProof, serverSlug, env2);
+  if (!proofResult.valid) {
+    return new Response(JSON.stringify({
+      error: "Payment proof invalid",
+      reason: proofResult.reason,
+      primitive: "AGT-ALPHA-V1",
+      claim_uri: "https://dominion-observatory.sgdata.workers.dev/api/agent-query"
+    }), {
+      status: 402,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+    });
+  }
+
+  // Resolve server URL from ?url param or slug match in DB
+  let serverUrl = url.searchParams.get("url");
+  if (!serverUrl) {
+    const found = await db.prepare(
+      "SELECT url FROM servers WHERE name = ? OR url LIKE ? LIMIT 1"
+    ).bind(serverSlug, `%${serverSlug}%`).first();
+    serverUrl = found ? found.url : `https://${serverSlug}.workers.dev/mcp`;
+  }
+
+  const trust = await handleCheckTrust(db, { server_url: serverUrl });
+
+  // Record premium call (best-effort, non-blocking)
+  db.prepare(
+    "INSERT INTO interactions (server_id, agent_id, tool_name, success, latency_ms, timestamp) " +
+    "SELECT id, ?, '_agent_query_premium', 1, 0, ? FROM servers WHERE url = ? LIMIT 1"
+  ).bind(agentId, new Date().toISOString(), serverUrl).run().catch(() => {});
+
+  return new Response(JSON.stringify({
+    primitive: "AGT-ALPHA-V1",
+    claim_uri: "https://dominion-observatory.sgdata.workers.dev/api/agent-query",
+    agent_query: {
+      server_slug: serverSlug,
+      server_url: serverUrl,
+      trust_verdict: trust,
+      queried_at: new Date().toISOString(),
+      agent_id: agentId,
+      payment_ref: proofResult.ref
+    }
+  }), {
+    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+  });
+}
+__name(handleAgentQuery, "handleAgentQuery");
+
 var index_default = {
   // Cloudflare cron entry point. Configured in wrangler.jsonc.
   // Runs every 15 minutes; probes ~25 callable MCP endpoints per run.
@@ -2078,7 +2202,7 @@ var index_default = {
         headers: {
           "Access-Control-Allow-Origin": "*",
           "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type"
+          "Access-Control-Allow-Headers": "Content-Type, X-Payment-Proof, X-Agent-Id"
         }
       });
     }
@@ -2814,6 +2938,44 @@ Sitemap: ${url.origin}/sitemap.xml
     if (url.pathname === "/mcp" && request.method === "POST") {
       return handleMCPRequest(request, db);
     }
+    // AGT-ALPHA-V1: x402-gated trust verdict (paid endpoint)
+    if (url.pathname.startsWith("/api/agent-query/") && request.method === "GET") {
+      const serverSlug = decodeURIComponent(url.pathname.replace("/api/agent-query/", ""));
+      return await handleAgentQuery(request, db, serverSlug, url, env2);
+    }
+    // Payment rail info for agents (free, machine-readable)
+    if (url.pathname === "/api/payment-info" && request.method === "GET") {
+      return new Response(JSON.stringify({
+        primitive: "AGT-ALPHA-V1",
+        claim_uri: "https://dominion-observatory.sgdata.workers.dev/api/agent-query",
+        payment_rails: [
+          {
+            rail: "x402-hmac-v1",
+            description: "HMAC-SHA256 internal proof (contact operator for shared secret)",
+            status: "live",
+            header: "X-Payment-Proof",
+            format: "hmac-sha256:base64:<timestamp_unix_minute>:<hmac_b64>",
+            signing_algo: "HMAC-SHA256(INTERNAL_AGENT_SECRET, 'agent-query:' + server_slug + ':' + timestamp_minute)"
+          },
+          {
+            rail: "x402-network",
+            description: "x402 protocol network settlement",
+            status: "planned",
+            spec: "https://x402.org"
+          },
+          {
+            rail: "stripe-mpp",
+            description: "Stripe Machine-to-Machine Payment Protocol",
+            status: "planned"
+          }
+        ],
+        pricing: { per_query_usd: "0.001", currency: "USD", endpoint: "GET /api/agent-query/{server-slug}" },
+        operator: "Dominion Agent Economy Engine, Singapore",
+        contact_for_secret: "https://github.com/vdineshk/daee-engine/issues"
+      }, null, 2), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+      });
+    }
     if (url.pathname === "/api/trust" && request.method === "GET") {
       const serverUrl = url.searchParams.get("url");
       if (!serverUrl) return new Response(JSON.stringify({ error: "url parameter required" }), { status: 400 });
@@ -2921,6 +3083,8 @@ Sitemap: ${url.origin}/sitemap.xml
       endpoints: {
         mcp: "/mcp",
         trust_check: "/api/trust?url=<server_url>",
+        agent_query_premium: "GET /api/agent-query/{server-slug}?url=<server_url> — x402-gated trust verdict (AGT-ALPHA-V1, $0.001/call, X-Payment-Proof header required)",
+        payment_info: "/api/payment-info — machine-readable payment rail spec",
         leaderboard: "/api/leaderboard?category=<category>&limit=<n>",
         stats: "/api/stats",
         report_interaction: "POST /api/report {server_url, success, latency_ms?, tool_name?, error_type?, error_message?, http_status?}",
