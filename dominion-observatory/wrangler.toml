@@ -10,3 +10,10 @@ database_id = "2979515b-1cfc-42f2-9f40-be1b680a73aa"
 
 [triggers]
 crons = ["*/15 * * * *"]
+
+# EBTO x402 external payment rail — set to your USDC wallet address on Base mainnet.
+# Until set, /agent-query/* returns 402 with empty accepts[] (soft-launch mode, no revenue collected).
+# Set via: Cloudflare Dashboard > Workers > dominion-observatory > Settings > Variables
+# This is INDEPENDENT of INTERNAL_AGENT_SECRET (which is for /api/agent-query/ HMAC internal rail only).
+[vars]
+PAYMENT_WALLET = ""

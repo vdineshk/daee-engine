@@ -55,28 +55,60 @@ P-021B-rev is partially satisfied: the Observatory route is live. Remaining by D
 
 ---
 
-## 5. WHAT YOU NEED TO DO — ONE ITEM (~2 minutes)
+## 5. WHAT YOU NEED TO DO — TWO ITEMS (in priority order)
 
-### Action A — Set INTERNAL_AGENT_SECRET on the Observatory Worker
+> **These two secrets are completely independent. Do not confuse them.**
 
-The x402 payment rail is live but the payment verification requires a shared secret. Until this secret is set, calling the endpoint with an `X-Payment-Proof` header returns "payment rail not configured." The 402-without-payment flow works correctly already.
+### Action A — Set PAYMENT_WALLET (HIGHEST PRIORITY — activates real revenue)
+
+**What it is:** The EBTO external x402 rail (`GET /agent-query/{server-name}`) on Base mainnet USDC. Setting this makes every external agent call generate $0.001 USDC revenue.
+
+**EXACT steps:**
+```
+1. Go to: https://dash.cloudflare.com
+2. Workers > dominion-observatory > Settings > Variables
+3. Add variable: PAYMENT_WALLET = 0xCF8C01f1EFc61fA0eCc7614Ed1fA8f668D9aA8A2
+   (or any other USDC wallet on Base mainnet you control)
+4. Click Save and Deploy
+Done.
+Verify: curl https://dominion-observatory.sgdata.workers.dev/agent-query/sg-regulatory-data-mcp
+        Look for: "wallet_status": "configured"
+```
+
+**Without this:** EBTO returns 402 with empty accepts[] — endpoint works, revenue not collected.  
+**With this:** Every x402-capable agent call = $0.001 USDC revenue.
+
+---
+
+### Action B — Set INTERNAL_AGENT_SECRET (lower priority — internal self-test only)
+
+**What it is:** The HMAC internal rail (`GET /api/agent-query/{server-slug}`) used ONLY by flywheel-keeper self-test. Not a revenue path. External agents do NOT use this endpoint.
 
 **EXACT steps:**
 ```
 1. Open terminal
 2. cd /path/to/daee-engine/dominion-observatory
 3. wrangler secret put INTERNAL_AGENT_SECRET
-4. When prompted, paste a random 32+ character string.
-   Generate one with: openssl rand -hex 32
+4. Paste: openssl rand -hex 32
 5. Press Enter.
 Done.
-Verify: wrangler secret list
+Verify: wrangler secret list (shows INTERNAL_AGENT_SECRET)
 ```
 
-This enables:
-- flywheel-keeper end-to-end self-test (P-021B-rev completion)
-- Any external agent you share the secret with to make paid calls
-- RUN-023 to complete P-021B-rev
+**Without this:** /api/agent-query/ returns "payment rail not configured" on paid calls — fine for now.  
+**With this:** flywheel-keeper can complete P-021B-rev HMAC self-test.
+
+---
+
+### Why two separate secrets?
+
+| | EBTO (Action A) | HMAC Internal (Action B) |
+|---|---|---|
+| Path | `/agent-query/{server}` | `/api/agent-query/{server}` |
+| Header | `X-PAYMENT` | `X-Payment-Proof` |
+| Config | `PAYMENT_WALLET` (Cloudflare dashboard) | `INTERNAL_AGENT_SECRET` (wrangler secret) |
+| Who calls it | External agents (real revenue) | flywheel-keeper only (self-test) |
+| Revenue | ✅ $0.001 USDC per call | ❌ no revenue |
 
 ---
 

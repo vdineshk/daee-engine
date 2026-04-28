@@ -2080,7 +2080,7 @@ async function handleAgentQuery(request, db, serverSlug, url, env2) {
       headers: {
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",
-        "X-Payment-Required": "x402",
+        "X-Payment-Required": "x402-hmac-internal",
         "X-Payment-Price-USD": PRICE_USD,
         "X-Payment-Currency": "USD",
         "X-Payment-Quote-ID": quoteId
@@ -2950,28 +2950,38 @@ Sitemap: ${url.origin}/sitemap.xml
         claim_uri: "https://dominion-observatory.sgdata.workers.dev/api/agent-query",
         payment_rails: [
           {
-            rail: "x402-hmac-v1",
-            description: "HMAC-SHA256 internal proof (contact operator for shared secret)",
-            status: "live",
+            rail: "x402-base-usdc",
+            description: "Real x402 micropayment via Base mainnet USDC. External agents use this rail.",
+            status: "live-soft-launch",
+            endpoint: "GET /agent-query/{server-name}",
+            header: "X-PAYMENT",
+            network: "base",
+            asset: "USDC (0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913)",
+            price_usd: "0.001",
+            primitive: "Empirical-Behavioral-Trust-Oracle-v1",
+            wallet_env_var: "PAYMENT_WALLET",
+            wallet_status: "set PAYMENT_WALLET in Cloudflare dashboard to activate revenue collection"
+          },
+          {
+            rail: "x402-hmac-internal",
+            description: "HMAC-SHA256 internal proof. Used by flywheel-keeper self-test; not for external agents.",
+            status: "live-internal-only",
+            endpoint: "GET /api/agent-query/{server-slug}",
             header: "X-Payment-Proof",
             format: "hmac-sha256:base64:<timestamp_unix_minute>:<hmac_b64>",
-            signing_algo: "HMAC-SHA256(INTERNAL_AGENT_SECRET, 'agent-query:' + server_slug + ':' + timestamp_minute)"
+            signing_algo: "HMAC-SHA256(INTERNAL_AGENT_SECRET, 'agent-query:' + server_slug + ':' + timestamp_minute)",
+            secret_env_var: "INTERNAL_AGENT_SECRET"
           },
           {
-            rail: "x402-network",
-            description: "x402 protocol network settlement",
+            rail: "x402-network-settlement",
+            description: "Full x402 network settlement (replaces hmac-internal when x402 client libs stabilize)",
             status: "planned",
             spec: "https://x402.org"
-          },
-          {
-            rail: "stripe-mpp",
-            description: "Stripe Machine-to-Machine Payment Protocol",
-            status: "planned"
           }
         ],
-        pricing: { per_query_usd: "0.001", currency: "USD", endpoint: "GET /api/agent-query/{server-slug}" },
+        pricing: { per_query_usd: "0.001", currency: "USD" },
         operator: "Dominion Agent Economy Engine, Singapore",
-        contact_for_secret: "https://github.com/vdineshk/daee-engine/issues"
+        contact: "https://github.com/vdineshk/daee-engine/issues"
       }, null, 2), {
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
       });
@@ -3076,15 +3086,106 @@ Sitemap: ${url.origin}/sitemap.xml
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
       });
     }
+    // EBTO: Empirical-Behavioral-Trust-Oracle — x402-priced pre-call trust verdict
+    // Primitive claimed 2026-04-27 (PR #13). External x402 rail: Base mainnet USDC.
+    // Path: /agent-query/{server-name}  (no /api/ prefix — distinct from /api/agent-query/ HMAC internal rail)
+    if (url.pathname.startsWith("/agent-query/") && request.method === "GET") {
+      const serverSlug = decodeURIComponent(url.pathname.replace("/agent-query/", "").replace(/\/$/, ""));
+      const paymentHeader = request.headers.get("X-PAYMENT");
+      const paymentWallet = (env2.PAYMENT_WALLET && env2.PAYMENT_WALLET.trim()) || null;
+      const corsHeaders = { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" };
+
+      if (!paymentHeader) {
+        const accepts = paymentWallet ? [{
+          scheme: "exact",
+          network: "base",
+          maxAmountRequired: "1000",
+          to: paymentWallet,
+          asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+          extra: { name: "USDC", version: "2" }
+        }] : [];
+        return new Response(JSON.stringify({
+          x402Version: 1,
+          error: "Payment Required",
+          description: "Pay $0.001 USDC via x402 to unlock a behavioral trust verdict from Dominion Observatory. Trust is derived from empirical cross-agent runtime telemetry — not on-chain registry data.",
+          amount_usd: "0.001",
+          primitive: "Empirical-Behavioral-Trust-Oracle-v1",
+          claim_uri: `${url.origin}/agent-query/`,
+          accepts,
+          facilitator: "https://api.cdp.coinbase.com/platform/v1/x402/facilitate",
+          resource: url.pathname,
+          wallet_status: paymentWallet ? "configured" : "not_configured_yet"
+        }), { status: 402, headers: corsHeaders });
+      }
+
+      // Payment header present — look up server and return verdict.
+      let server = null;
+      if (serverSlug.startsWith("http")) {
+        server = await db.prepare("SELECT * FROM servers WHERE url = ?").bind(serverSlug).first();
+      }
+      if (!server) {
+        server = await db.prepare("SELECT * FROM servers WHERE LOWER(name) = LOWER(?) LIMIT 1").bind(serverSlug).first();
+      }
+      if (!server) {
+        server = await db.prepare("SELECT * FROM servers WHERE url LIKE ? ORDER BY trust_score DESC LIMIT 1").bind(`%${serverSlug}%`).first();
+      }
+
+      if (!server) {
+        return new Response(JSON.stringify({
+          server_identifier: serverSlug,
+          trust_verdict: "UNKNOWN",
+          recommendation: "use-with-care",
+          trust_score: null,
+          message: "Server not yet tracked in Dominion Observatory. Report an interaction via POST /api/report to begin building its behavioral profile.",
+          primitive: "Empirical-Behavioral-Trust-Oracle-v1",
+          claim_uri: `${url.origin}/agent-query/`,
+          payment_status: "soft_launch_v0",
+          data_basis: "cross-agent-empirical-telemetry"
+        }), { headers: corsHeaders });
+      }
+
+      const recent = await db.prepare(
+        "SELECT COUNT(*) as cnt, AVG(latency_ms) as avg_lat FROM interactions WHERE server_id = ? AND timestamp > datetime('now', '-7 days')"
+      ).bind(server.id).first();
+
+      const score = server.trust_score || 0;
+      const verdict = score >= 70 ? "TRUSTED" : score >= 40 ? "CAUTION" : "RISKY";
+      const recommendation = score >= 70 ? "proceed" : score >= 40 ? "caution" : "avoid";
+
+      return new Response(JSON.stringify({
+        server_identifier: serverSlug,
+        server_url: server.url,
+        server_name: server.name,
+        category: server.category,
+        trust_verdict: verdict,
+        recommendation,
+        trust_score: Math.round(score * 10) / 10,
+        evidence: {
+          total_interactions: server.total_calls || 0,
+          success_rate_pct: server.total_calls > 0 ? Math.round(server.successful_calls / server.total_calls * 1000) / 10 : null,
+          avg_latency_ms: Math.round(server.avg_latency_ms || 0),
+          p95_latency_ms: Math.round(server.p95_latency_ms || 0),
+          recent_7d_interactions: recent?.cnt || 0,
+          recent_7d_avg_latency_ms: recent?.avg_lat ? Math.round(recent.avg_lat) : null,
+          data_since: "2026-04-08"
+        },
+        primitive: "Empirical-Behavioral-Trust-Oracle-v1",
+        claim_uri: `${url.origin}/agent-query/`,
+        payment_status: "soft_launch_v0",
+        payment_note: "v0: X-PAYMENT header received. Real x402 facilitator verification activates when PAYMENT_WALLET is configured.",
+        data_basis: "cross-agent-empirical-telemetry"
+      }), { headers: corsHeaders });
+    }
     const infoPayload = {
       name: "Dominion Observatory",
-      version: "1.0.0",
+      version: "1.3.0",
       description: "The behavioral trust layer for the AI agent economy. Check MCP server reliability before you call. Report outcomes to strengthen the trust network.",
       endpoints: {
         mcp: "/mcp",
         trust_check: "/api/trust?url=<server_url>",
-        agent_query_premium: "GET /api/agent-query/{server-slug}?url=<server_url> — x402-gated trust verdict (AGT-ALPHA-V1, $0.001/call, X-Payment-Proof header required)",
-        payment_info: "/api/payment-info — machine-readable payment rail spec",
+        agent_query_ebto: "GET /agent-query/{server-name} [X-PAYMENT: <x402-proof>] — EBTO x402 external rail, $0.001 USDC on Base. Returns 402 without payment. Primitive: Empirical-Behavioral-Trust-Oracle-v1.",
+        agent_query_hmac_internal: "GET /api/agent-query/{server-slug} [X-Payment-Proof: hmac-sha256:...] — HMAC internal rail for flywheel-keeper self-test only.",
+        payment_info: "/api/payment-info — machine-readable spec for both payment rails",
         leaderboard: "/api/leaderboard?category=<category>&limit=<n>",
         stats: "/api/stats",
         report_interaction: "POST /api/report {server_url, success, latency_ms?, tool_name?, error_type?, error_message?, http_status?}",
