@@ -1,0 +1,41 @@
+{
+  "version": "1.0",
+  "updated": "2026-04-29",
+  "checks": [
+    {
+      "endpoint": "https://dominion-observatory.sgdata.workers.dev/agent-query/sg-cpf-calculator-mcp",
+      "method": "GET",
+      "expected_status": 402,
+      "expected_json": {
+        "wallet_status": "configured",
+        "to": "0xCF8C01f1EFc61fA0eCc7614Ed1fA8f668D9aA8A2",
+        "x402Version": 1
+      },
+      "description": "EBTO x402 payment-gated trust endpoint"
+    },
+    {
+      "endpoint": "https://dominion-observatory.sgdata.workers.dev/api/agent-query/sg-cpf-calculator-mcp",
+      "method": "GET",
+      "expected_status": 402,
+      "expected_json": {
+        "payment_required": true,
+        "auth_type": "hmac"
+      },
+      "description": "AGT internal HMAC-gated trust endpoint"
+    },
+    {
+      "endpoint": "https://dominion-observatory.sgdata.workers.dev/api/stats",
+      "method": "GET",
+      "expected_status": 200,
+      "expected_json_contains_key": "total_servers_tracked",
+      "description": "Observatory stats baseline"
+    },
+    {
+      "endpoint": "https://dominion-observatory.sgdata.workers.dev/api/trust?url=https://sg-cpf-calculator-mcp.sgdata.workers.dev/mcp",
+      "method": "GET",
+      "expected_status": 200,
+      "expected_json_contains_key": "trust_score",
+      "description": "Trust check regression"
+    }
+  ]
+}

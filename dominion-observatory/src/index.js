@@ -2914,13 +2914,140 @@ Sitemap: ${url.origin}/sitemap.xml
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
       });
     }
+    if (url.pathname.startsWith("/agent-query/") && request.method === "GET") {
+      const serverSlug = decodeURIComponent(url.pathname.replace("/agent-query/", "")).replace(/\/$/, "");
+      const paymentWallet = env2.PAYMENT_WALLET || "0xCF8C01f1EFc61fA0eCc7614Ed1fA8f668D9aA8A2";
+      const paymentHeader = request.headers.get("X-PAYMENT");
+      const paymentRequiredBody = {
+        x402Version: 1,
+        error: "Payment required",
+        wallet_status: "configured",
+        to: paymentWallet,
+        accepts: [{
+          scheme: "exact",
+          network: "base",
+          maxAmountRequired: "1000",
+          to: paymentWallet,
+          asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+          extra: { name: "USDC", version: "1" },
+          description: "Pay $0.001 USDC on Base mainnet to receive MCP server runtime trust verdict"
+        }],
+        server_slug: serverSlug,
+        claim_uri: `${url.origin}/agent-query/${serverSlug}`
+      };
+      if (!paymentHeader) {
+        return new Response(JSON.stringify(paymentRequiredBody), {
+          status: 402,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "X-PAYMENT-RESPONSE": JSON.stringify({ x402Version: 1, error: "Payment required", accepts: paymentRequiredBody.accepts })
+          }
+        });
+      }
+      const server = await db.prepare(
+        "SELECT url, name, category, trust_score, total_calls, successful_calls, failed_calls, avg_latency_ms, first_seen FROM servers WHERE LOWER(REPLACE(REPLACE(REPLACE(name, ' ', '-'), '.', '-'), '/', '-')) = ? OR url LIKE ? LIMIT 1"
+      ).bind(serverSlug, `%${serverSlug}%`).first();
+      if (!server) {
+        return new Response(JSON.stringify({ error: "Server not found", server_slug: serverSlug, payment_received: true }), {
+          status: 404,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      const score = Math.round(server.trust_score * 10) / 10;
+      return new Response(JSON.stringify({
+        server_slug: serverSlug,
+        server_url: server.url,
+        server_name: server.name,
+        trust_score: score,
+        verdict: score >= 80 ? "TRUSTED" : score >= 50 ? "CAUTION" : "UNTRUSTED",
+        category: server.category,
+        total_probes: server.total_calls,
+        successful_probes: server.successful_calls,
+        failed_probes: server.failed_calls,
+        avg_latency_ms: server.avg_latency_ms ? Math.round(server.avg_latency_ms) : null,
+        tracked_since: server.first_seen,
+        payment_received: true,
+        claim_uri: `${url.origin}/agent-query/${serverSlug}`
+      }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+      });
+    }
+    if (url.pathname.startsWith("/api/agent-query/") && request.method === "GET") {
+      const serverSlug = decodeURIComponent(url.pathname.replace("/api/agent-query/", "")).replace(/\/$/, "");
+      const hmacSig = url.searchParams.get("hmac");
+      const nonce = url.searchParams.get("nonce");
+      if (!hmacSig || !nonce) {
+        const challengeNonce = crypto.randomUUID();
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+        return new Response(JSON.stringify({
+          payment_required: true,
+          auth_type: "hmac",
+          wallet_status: "configured",
+          hmac_challenge: {
+            nonce: challengeNonce,
+            expires_at: expiresAt,
+            algorithm: "HMAC-SHA256",
+            hint: "Sign nonce with shared AGENT_HMAC_SECRET, pass as ?hmac=<hex-sig>&nonce=<nonce>"
+          },
+          server_slug: serverSlug,
+          claim_uri: `${url.origin}/api/agent-query/${serverSlug}`
+        }), {
+          status: 402,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      const hmacSecret = env2.AGENT_HMAC_SECRET;
+      if (!hmacSecret) {
+        return new Response(JSON.stringify({ error: "HMAC secret not configured", server_slug: serverSlug }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      let authenticated = false;
+      try {
+        const encoder = new TextEncoder();
+        const key = await crypto.subtle.importKey("raw", encoder.encode(hmacSecret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+        const sigBytes = await crypto.subtle.sign("HMAC", key, encoder.encode(nonce));
+        const expectedHex = Array.from(new Uint8Array(sigBytes)).map((b) => b.toString(16).padStart(2, "0")).join("");
+        authenticated = hmacSig === expectedHex;
+      } catch (_) {
+        authenticated = false;
+      }
+      if (!authenticated) {
+        return new Response(JSON.stringify({ error: "Invalid HMAC signature", server_slug: serverSlug }), {
+          status: 401,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      const server = await db.prepare(
+        "SELECT url, name, category, trust_score, total_calls, successful_calls, failed_calls, avg_latency_ms, first_seen FROM servers WHERE LOWER(REPLACE(REPLACE(REPLACE(name, ' ', '-'), '.', '-'), '/', '-')) = ? OR url LIKE ? LIMIT 1"
+      ).bind(serverSlug, `%${serverSlug}%`).first();
+      const score = server ? Math.round(server.trust_score * 10) / 10 : null;
+      return new Response(JSON.stringify({
+        server_slug: serverSlug,
+        server_url: server ? server.url : null,
+        trust_score: score,
+        verdict: score !== null ? (score >= 80 ? "TRUSTED" : score >= 50 ? "CAUTION" : "UNTRUSTED") : "UNKNOWN",
+        category: server ? server.category : null,
+        total_probes: server ? server.total_calls : null,
+        tracked_since: server ? server.first_seen : null,
+        auth_type: "hmac",
+        authenticated: true,
+        claim_uri: `${url.origin}/api/agent-query/${serverSlug}`
+      }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+      });
+    }
     const infoPayload = {
       name: "Dominion Observatory",
-      version: "1.0.0",
+      version: "1.1.0",
       description: "The behavioral trust layer for the AI agent economy. Check MCP server reliability before you call. Report outcomes to strengthen the trust network.",
       endpoints: {
         mcp: "/mcp",
         trust_check: "/api/trust?url=<server_url>",
+        agent_trust_query_x402: "/agent-query/<server-slug> (GET, HTTP 402 + X-PAYMENT header, $0.001 USDC Base)",
+        agent_trust_query_hmac: "/api/agent-query/<server-slug> (GET, HTTP 402 + HMAC challenge)",
         leaderboard: "/api/leaderboard?category=<category>&limit=<n>",
         stats: "/api/stats",
         report_interaction: "POST /api/report {server_url, success, latency_ms?, tool_name?, error_type?, error_message?, http_status?}",
