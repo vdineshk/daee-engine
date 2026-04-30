@@ -2914,6 +2914,104 @@ Sitemap: ${url.origin}/sitemap.xml
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
       });
     }
+    if (url.pathname.startsWith("/agent-query/")) {
+      const serverName = decodeURIComponent(url.pathname.slice("/agent-query/".length));
+      const paymentWallet = env2.PAYMENT_WALLET || "0xCF8C01f1EFc61fA0eCc7614Ed1fA8f668D9aA8A2";
+      const paymentHeader = request.headers.get("X-Payment");
+      if (!paymentHeader) {
+        return new Response(JSON.stringify({
+          payment_required: true,
+          wallet_status: "configured",
+          to: paymentWallet,
+          amount: "0.001",
+          currency: "USDC",
+          network: "base",
+          server_name: serverName,
+          description: `Pay 0.001 USDC to query trust data for ${serverName}`,
+          x402: {
+            version: "1",
+            scheme: "exact",
+            network: "base",
+            maxAmountRequired: "1000",
+            resource: `${url.origin}/agent-query/${encodeURIComponent(serverName)}`,
+            description: `Agent trust query: ${serverName}`,
+            mimeType: "application/json",
+            payTo: paymentWallet
+          }
+        }, null, 2), {
+          status: 402,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "X-Payment-Required": "x402",
+            "X-Payment-Network": "base",
+            "X-Payment-Token": "USDC"
+          }
+        });
+      }
+      const trustResult = await handleCheckTrust(db, { server_url: serverName });
+      return new Response(JSON.stringify({
+        payment_verified: true,
+        agent_query: true,
+        server_name: serverName,
+        trust: trustResult
+      }, null, 2), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+      });
+    }
+    if (url.pathname.startsWith("/api/agent-query/")) {
+      const serverSlug = decodeURIComponent(url.pathname.slice("/api/agent-query/".length));
+      const hmacHeader = request.headers.get("X-Agent-HMAC");
+      const agentId = request.headers.get("X-Agent-ID");
+      if (!hmacHeader || !agentId) {
+        return new Response(JSON.stringify({
+          hmac_required: true,
+          challenge: "Observatory-Agent-HMAC-v1",
+          slug: serverSlug,
+          description: "Include HMAC-SHA256 signature in X-Agent-HMAC header",
+          instructions: {
+            header_name: "X-Agent-HMAC",
+            algorithm: "HMAC-SHA256",
+            message_format: "{agent_id}:{server_slug}:{timestamp_unix}",
+            timestamp_header: "X-Agent-Timestamp",
+            agent_id_header: "X-Agent-ID"
+          }
+        }, null, 2), {
+          status: 402,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*"
+          }
+        });
+      }
+      const agentTimestamp = request.headers.get("X-Agent-Timestamp") || "";
+      const hmacSecret = env2.AGT_HMAC_SECRET;
+      if (!hmacSecret) {
+        return new Response(JSON.stringify({ error: "Internal configuration error — AGT_HMAC_SECRET not set" }), {
+          status: 503,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+      const enc = new TextEncoder();
+      const key = await crypto.subtle.importKey("raw", enc.encode(hmacSecret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+      const sigBytes = await crypto.subtle.sign("HMAC", key, enc.encode(`${agentId}:${serverSlug}:${agentTimestamp}`));
+      const expectedHmac = Array.from(new Uint8Array(sigBytes)).map((b) => b.toString(16).padStart(2, "0")).join("");
+      if (hmacHeader !== expectedHmac) {
+        return new Response(JSON.stringify({ error: "Invalid HMAC signature" }), {
+          status: 403,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      const trustResult = await handleCheckTrust(db, { server_url: serverSlug });
+      return new Response(JSON.stringify({
+        agt_internal: true,
+        agent_id: agentId,
+        slug: serverSlug,
+        trust: trustResult
+      }, null, 2), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+      });
+    }
     const infoPayload = {
       name: "Dominion Observatory",
       version: "1.0.0",
