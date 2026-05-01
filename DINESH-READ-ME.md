@@ -1,19 +1,21 @@
-# DINESH-READ-ME — 2026-04-25 (D19, Sat)
+# DINESH-READ-ME — 2026-05-01 (D25, Fri)
 
 > **Why this file exists:** Gmail drafts are unreliable; GitHub commit-activity IS visible. This file surfaces Builder state at repo root, refreshed each run.
-> **Replaces D16 (RUN-018) version. RUN-019 and RUN-020 produced no commits — RUN-020 hit the streaming-timeout bug that v4.1 was authored to survive.**
+> **Replaces D19 (RUN-021) version. RUN-022 = this run. RUN-019/020 produced no commits; RUN-021 was the redesign run; RUN-022 (today) ships the x402 EBTO payment rail per P-021B-rev.**
 
 ---
 
 ## 1. STATUS IN ONE LINE
 
-**RUN-018 pre-commitment fired and a redesign brief was written, but Builder OVERCORRECTED to a B2B-human pivot. CEO rescinded mid-run. Corrected axis: stay on the empire's agent-to-agent thesis; build x402 / Stripe MPP payment rails INTO the Observatory itself so agent revenue is captured the moment agent traffic arrives. The HN draft remains de-prioritized. The Option-C cold-email plan is dead. New pre-commitments below.**
+**x402 payment rail is now LIVE on the Observatory. `/agent-query/{server-name}` returns HTTP 402 + USDC wallet address (`0xCF8C01f1EFc61fA0eCc7614Ed1fA8f668D9aA8A2`) on Base mainnet. First agent-payable endpoint in the empire. P-021B-rev partially satisfied (route live; flywheel-keeper HMAC self-test is RUN-023). Revenue = $0 but the rail that connects to revenue is deployed.**
 
 ---
 
-## 2. THE CORRECTED DIRECTION IN ONE PARAGRAPH
+## 2. STATE (RUN-022, 2026-05-01)
 
-19 days, 0 organic Observatory calls, across 3 long-form posts + 9 LangChain PRs + 4 registries + 2 SDK packages. The agent-discovery flywheel positioned at the front of the empire does not yet spin at our volume — but the answer is NOT to pivot off the flywheel. The answer is to **arm the flywheel with the payment rails it will need the moment it spins**: x402-priced premium endpoints on the Observatory (`/agent-query/{server-name}` etc.), an x402-aware Cloudflare Worker route that returns 402-Payment-Required with a quote and unlocks the trust verdict on payment receipt, end-to-end self-tested by the Builder's own flywheel-keeper as the test agent. Buyer is software. Payment rail is x402 / Stripe MPP / AP2. No human procurement path. Three monetization shapes (AGT-α x402-priced endpoints, AGT-β trust-aware MCP router, AGT-γ subscription-attestation feed) — Builder specs and recommends in RUN-022; CEO ratifies. The S$10K/mo target is a function of agents paying agents through the Observatory. Existing infrastructure (SDK, 8 servers, registry listings) is the substrate for the rail, not a sales surface.
+AWAKEN found both EBTO and AGT endpoints returning HTTP 404 — they were never previously deployed. RUN-022 was fully consumed by P0 INFRA-RECOVERY: building the x402-gated trust verdict route from scratch, adding `PAYMENT_WALLET` to `wrangler.toml [vars]`, setting `AGT_HMAC_SECRET` via `wrangler secret put`, dry-running, deploying, and verifying health. Both endpoints now return HTTP 402 with correct JSON shape per HARD RULE 6.
+
+Stats as of this run: external_interactions_total = 9, external_24h = 0, days since organic call ≈ 25. DEMAND CRISIS still active but INFRA-RECOVERY took precedence per protocol.
 
 ---
 

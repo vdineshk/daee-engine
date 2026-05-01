@@ -1,0 +1,38 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-05-01",
+  "endpoints": [
+    {
+      "url": "https://dominion-observatory.sgdata.workers.dev/agent-query/sg-cpf-calculator-mcp",
+      "expected_status": 402,
+      "expected_json": {
+        "wallet_status": "configured",
+        "to": "0xCF8C01f1EFc61fA0eCc7614Ed1fA8f668D9aA8A2",
+        "currency": "USDC",
+        "chain": "base"
+      },
+      "description": "EBTO x402 payment endpoint — no payment header should return 402 + configured wallet",
+      "revenue_critical": true
+    },
+    {
+      "url": "https://dominion-observatory.sgdata.workers.dev/api/agent-query/sg-cpf-calculator-mcp",
+      "expected_status": 402,
+      "expected_json": {
+        "status": "challenge",
+        "wallet_status": "configured",
+        "hmac_required": true
+      },
+      "description": "AGT internal HMAC endpoint — should return 402 + HMAC challenge structure",
+      "revenue_critical": false
+    },
+    {
+      "url": "https://dominion-observatory.sgdata.workers.dev/api/stats",
+      "expected_status": 200,
+      "expected_json": {
+        "observatory": "Dominion Observatory"
+      },
+      "description": "Observatory stats endpoint — core health check",
+      "revenue_critical": false
+    }
+  ]
+}

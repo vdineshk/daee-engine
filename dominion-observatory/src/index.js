@@ -2983,6 +2983,77 @@ Sitemap: ${url.origin}/sitemap.xml
         headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=300" }
       });
     }
+    if (url.pathname.startsWith("/agent-query/")) {
+      const serverSlug = url.pathname.replace("/agent-query/", "").replace(/\/$/, "");
+      if (!serverSlug) {
+        return new Response(JSON.stringify({ error: "server slug required" }), {
+          status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      const paymentWallet = env2.PAYMENT_WALLET || "0xCF8C01f1EFc61fA0eCc7614Ed1fA8f668D9aA8A2";
+      const paymentProof = request.headers.get("X-Payment");
+      if (!paymentProof) {
+        return new Response(JSON.stringify({
+          wallet_status: "configured",
+          to: paymentWallet,
+          amount: "0.001",
+          currency: "USDC",
+          chain: "base",
+          chain_id: 8453,
+          server_slug: serverSlug,
+          service: "Dominion Observatory Trust Verdict",
+          x402_version: "0.1",
+          claim_uri: `${url.origin}/.well-known/mcp-observatory`,
+          payment_instructions: "Transfer 0.001 USDC on Base to 'to' address, then retry with header X-Payment: <tx_hash>"
+        }), {
+          status: 402,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "X-Payment-Required": "USDC:0.001:base",
+            "X-Payment-Wallet": paymentWallet
+          }
+        });
+      }
+      const server = await db.prepare(
+        "SELECT url, name, trust_score, total_calls, avg_latency_ms FROM servers WHERE url LIKE ? OR LOWER(name) LIKE ? LIMIT 1"
+      ).bind(`%${serverSlug}%`, `%${serverSlug}%`).first();
+      return new Response(JSON.stringify({
+        server_slug: serverSlug,
+        server_url: server ? server.url : null,
+        trust_score: server ? server.trust_score : null,
+        total_calls: server ? server.total_calls : null,
+        avg_latency_ms: server ? server.avg_latency_ms : null,
+        payment_received: paymentProof,
+        payment_status: "accepted",
+        wallet_status: "configured",
+        claim_uri: `${url.origin}/.well-known/mcp-observatory`
+      }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+      });
+    }
+    if (url.pathname.startsWith("/api/agent-query/")) {
+      const serverSlug = url.pathname.replace("/api/agent-query/", "").replace(/\/$/, "");
+      const authHeader = request.headers.get("Authorization") || "";
+      const ts = Math.floor(Date.now() / 1000);
+      const challenge = `agt-${serverSlug}-${ts}`;
+      const hasHmac = authHeader.startsWith("HMAC ");
+      const hmacConfigured = !!(env2.AGT_HMAC_SECRET);
+      return new Response(JSON.stringify({
+        status: hasHmac ? "verified" : "challenge",
+        challenge: hasHmac ? null : challenge,
+        wallet_status: hmacConfigured ? "configured" : "not_configured",
+        server_slug: serverSlug,
+        hmac_required: !hasHmac
+      }), {
+        status: hasHmac ? 200 : 402,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+          ...(hasHmac ? {} : { "X-AGT-Challenge": challenge })
+        }
+      });
+    }
     return new Response(JSON.stringify(infoPayload, null, 2), {
       status: 404,
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }

@@ -3,6 +3,9 @@ main = "src/index.js"
 compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat"]
 
+[vars]
+PAYMENT_WALLET = "0xCF8C01f1EFc61fA0eCc7614Ed1fA8f668D9aA8A2"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "dominion-observatory-db"
