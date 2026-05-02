@@ -3,7 +3,9 @@
 ## Status
 Cat 2 failover — Notion writes incomplete (DAEE-Decisions ID not found in Brain content). Git is truth; this file preserves content for next-run FAILOVER reconciliation.
 
-[UNRECONCILED — pending next run]
+[RECONCILED-2026-05-02 by Builder RUN-023]
+Brain verified: all 3 WHAT WORKS / WHAT FAILS / ADAPTATIONS entries from this FAILOVER are present in DAEE-Brain as of RUN-023 AWAKEN grep-check.
+DAEE-Decisions daily report for RUN-022 was NOT separately created (skipped — content subsumed into RUN-023 run health section).
 
 ---
 
