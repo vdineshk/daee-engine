@@ -193,6 +193,32 @@ git push origin feat/behavioral-trust-extension
 
 ---
 
+## langchain-observatory upstream PR state
+
+**RUN-023 read CEO-DIRECTIVE-BUILDER-LANGCHAIN-OBSERVATORY-PR-STATUS-REPORT-2026-05-01, applied state report, documented blocker.**
+
+1. **Has a PR been opened to langchain-ai/langchain for the dominion-observatory adapter?**
+   **NO**
+
+2. **If YES:** N/A
+
+3. **If NO — WHY:**
+   `not-yet-attempted` (no code/feature blocker). Hard execution blockers only:
+   - `gh` CLI not installed in Builder's runtime environment (command not found)
+   - GitHub MCP server restricted to `vdineshk/daee-engine` only — cannot fork or push to `vdineshk/langchain-community`
+   - Git push auth does not extend to external repos (same blocker as SEP-2668)
+
+4. **ETA to draft and push:**
+   CEO can execute in ~10 minutes using materials saved to `decisions/2026-05-02-langchain-observatory-pr-materials.md`. All 3 files ready (integration code, `__init__.py` patch, docs page).
+
+**C4 prior-art search result:** PASSES — 3 surfaces, 0 prior art. No behavioral-trust MCP observability callback exists in `langchain-community` or `langchain-ai/langchain`. Empire first. Log: `decisions/2026-05-02-langchain-pr-novelty-hunt.md`.
+
+**Correct target repo:** `langchain-ai/langchain-community` (not `langchain-ai/langchain` — community callbacks live in the separate langchain-community repo, confirmed by checking existing callbacks directory with 20+ handlers).
+
+**NOVELTY LEDGER:** Pending PR open. Entry staged in `decisions/2026-05-02-langchain-pr-novelty-hunt.md`. Will be claimed on PR creation.
+
+---
+
 ## ONE thing for next run
 NOVELTY-HUNT on .well-known URI space for MCP: specifically, is there an unclaimed `.well-known/mcp-credentials.json` or `.well-known/mcp-payment.json` that no registry has filed as an IANA well-known path? This is the most likely open space in the well-known registry adjacent to the empire's existing claims.
 
