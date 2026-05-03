@@ -3,7 +3,7 @@
 ## Status
 Cat 2 failover — Notion writes incomplete (DAEE-Decisions ID not found in Brain content). Git is truth; this file preserves content for next-run FAILOVER reconciliation.
 
-[UNRECONCILED — pending next run]
+[RECONCILED-2026-05-03 — Brain grep confirmed RUN-022 genome entries present in Brain. RUN-023 EVOLVE writes completing Notion catch-up.]
 
 ---
 
@@ -79,4 +79,4 @@ Done. Verify: Strategist's next deploy preserves Builder's routes.
 
 This is P0 because every Strategist Observatory deploy will wipe Builder's EBTO routes until this PR is merged.
 
-[UNRECONCILED — pending next run]
+[RECONCILED-2026-05-03 — Brain grep confirmed RUN-022 genome entries present in Brain. RUN-023 EVOLVE writes completing Notion catch-up.]
