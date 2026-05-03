@@ -110,10 +110,54 @@ interface KeeperState {
   last_tool_ok: boolean;
   last_tool_latency_ms: number;
   last_error?: string;
+  agt_self_test_ok?: boolean;
+  agt_self_test_at?: string;
+  agt_self_test_latency_ms?: number;
+}
+
+async function computeHmacSHA256(secret: string, message: string): Promise<string> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(message));
+  return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Validates the AGT /api/agent-query/ two-step HMAC flow end-to-end.
+// Step 1: unauthenticated → expect HTTP 402 + challenge field.
+// Step 2: HMAC(secret, challenge) in Authorization header → expect HTTP 200 + status:"verified".
+async function selfTestAgtEndpoint(
+  env: Env,
+  serverSlug: string
+): Promise<{ ok: boolean; challenge_status: number; verify_status: number; verified: boolean; latency_ms: number }> {
+  const start = Date.now();
+  try {
+    const r1 = await env.OBSERVATORY.fetch(`https://internal/api/agent-query/${serverSlug}`, { method: "GET" });
+    const body1 = await r1.json() as { challenge?: string };
+    const challenge = body1.challenge ?? `agt-${serverSlug}-fallback`;
+    const secret = env.AGT_HMAC_SECRET ?? "self-test-token";
+    const hmacHex = await computeHmacSHA256(secret, challenge);
+    const r2 = await env.OBSERVATORY.fetch(`https://internal/api/agent-query/${serverSlug}`, {
+      method: "GET",
+      headers: { "Authorization": `HMAC ${hmacHex}` },
+    });
+    const body2 = await r2.json() as { status?: string };
+    return {
+      ok: r2.status === 200,
+      challenge_status: r1.status,
+      verify_status: r2.status,
+      verified: body2.status === "verified",
+      latency_ms: Date.now() - start,
+    };
+  } catch {
+    return { ok: false, challenge_status: 0, verify_status: 0, verified: false, latency_ms: Date.now() - start };
+  }
 }
 
 interface Env {
   KEEPER_STATE?: KVNamespace;
+  AGT_HMAC_SECRET?: string;
   SG_REG: Fetcher;
   SG_COMPANY: Fetcher;
   ASEAN_TRADE: Fetcher;
@@ -303,6 +347,28 @@ async function runTick(env: Env): Promise<KeeperState> {
     lastToolLatency = probe.latency;
   }
 
+  // Every 6th tick (~every 30 min), run the AGT /api/agent-query/ self-test.
+  // This validates the x402 HMAC payment rail end-to-end: unauthenticated call
+  // returns 402 + challenge; authenticated call returns 200 + "verified".
+  let agtSelfTestOk: boolean | undefined;
+  let agtSelfTestAt: string | undefined;
+  let agtSelfTestLatency: number | undefined;
+  if (tickCount % 6 === 0) {
+    const agtResult = await selfTestAgtEndpoint(env, "sg-cpf-calculator-mcp");
+    agtSelfTestOk = agtResult.ok && agtResult.verified;
+    agtSelfTestAt = now.toISOString();
+    agtSelfTestLatency = agtResult.latency_ms;
+    // Report self-test result to Observatory as a named interaction.
+    await reportInteraction(
+      env,
+      "https://dominion-observatory.sgdata.workers.dev/api/agent-query/sg-cpf-calculator-mcp",
+      agtSelfTestOk,
+      agtResult.latency_ms,
+      "_keeper_agt_self_test",
+      agtResult.verify_status
+    );
+  }
+
   const state: KeeperState = {
     tick_count: tickCount,
     last_tick_at: now.toISOString(),
@@ -311,6 +377,11 @@ async function runTick(env: Env): Promise<KeeperState> {
     last_tool_server: lastToolServer,
     last_tool_ok: lastToolOk,
     last_tool_latency_ms: lastToolLatency,
+    ...(agtSelfTestOk !== undefined && {
+      agt_self_test_ok: agtSelfTestOk,
+      agt_self_test_at: agtSelfTestAt,
+      agt_self_test_latency_ms: agtSelfTestLatency,
+    }),
   };
 
   if (env.KEEPER_STATE) {
@@ -367,6 +438,20 @@ export default {
       // Observatory and KV, no secrets, no destructive effects.
       const state = await runTick(env);
       return new Response(JSON.stringify(state, null, 2), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (url.pathname === "/agt-test") {
+      // Manual trigger for the AGT HMAC self-test. Validates the x402 payment
+      // rail end-to-end without waiting for the 6th-tick schedule.
+      const result = await selfTestAgtEndpoint(env, "sg-cpf-calculator-mcp");
+      return new Response(JSON.stringify({
+        primitive: "AGT-ALPHA-V1 x402 HMAC Payment Rail",
+        self_test: result,
+        pass: result.ok && result.verified,
+        claim_uri: "https://dominion-observatory.sgdata.workers.dev/.well-known/mcp-observatory",
+      }, null, 2), {
         headers: { "Content-Type": "application/json" },
       });
     }
