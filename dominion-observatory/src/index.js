@@ -3056,6 +3056,43 @@ Sitemap: ${url.origin}/sitemap.xml
         }
       });
     }
+    if (url.pathname === "/llms.txt") {
+      const llmsTxt = `# Dominion Observatory
+# https://dominion-observatory.sgdata.workers.dev
+
+> The behavioral trust layer for the AI agent economy.
+> Cross-ecosystem runtime telemetry for 4,500+ MCP servers.
+> Data since 2026-04-08.
+
+## MCP endpoint
+- /mcp -- full tool suite (check_trust, report_interaction, get_leaderboard, get_baselines, check_anomaly, register_server, get_server_history, observatory_stats, get_compliance_report)
+
+## REST API
+- GET  /api/trust?url=<server_url>
+- GET  /api/leaderboard?category=<cat>&limit=<n>
+- GET  /api/stats
+- POST /api/report
+- POST /api/register
+- GET  /api/compliance?server_url=<url>&agent_id=<id>&start_date=<YYYY-MM-DD>&end_date=<YYYY-MM-DD>
+- GET  /api/servers?category=<cat>&limit=<n>
+- GET  /api/info
+- GET  /benchmark/<server-name>
+- GET  /agent-query/<server-name>
+
+## Schema
+mcp-behavioral-evidence-v1.0
+
+## Operator
+Dominion Agent Economy Engine, Singapore
+`;
+      return new Response(llmsTxt, {
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "public, max-age=3600",
+          "Access-Control-Allow-Origin": "*"
+        }
+      });
+    }
     if (url.pathname.startsWith("/benchmark/")) {
       const serverSlug = url.pathname.replace("/benchmark/", "").replace(/\/$/, "");
       if (!serverSlug) {
