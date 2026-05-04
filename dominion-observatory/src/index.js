@@ -2916,7 +2916,7 @@ Sitemap: ${url.origin}/sitemap.xml
     }
     const infoPayload = {
       name: "Dominion Observatory",
-      version: "1.0.0",
+      version: "1.1.0",
       description: "The behavioral trust layer for the AI agent economy. Check MCP server reliability before you call. Report outcomes to strengthen the trust network.",
       endpoints: {
         mcp: "/mcp",
@@ -2927,6 +2927,8 @@ Sitemap: ${url.origin}/sitemap.xml
         register_server: "POST /api/register {server_url, name, description?, category?, github_url?}",
         compliance_export: "/api/compliance?server_url=<url>&agent_id=<id>&start_date=<YYYY-MM-DD>&end_date=<YYYY-MM-DD>",
         servers_list: "/api/servers?category=<category>&limit=<n>",
+        benchmark: "/benchmark/<server-name>",
+        agent_query: "/agent-query/<server-name>",
         info: "/api/info",
         landing: "/"
       },
@@ -3051,6 +3053,91 @@ Sitemap: ${url.origin}/sitemap.xml
           "Content-Type": "application/json",
           "Access-Control-Allow-Origin": "*",
           ...(hasHmac ? {} : { "X-AGT-Challenge": challenge })
+        }
+      });
+    }
+    if (url.pathname.startsWith("/benchmark/")) {
+      const serverSlug = url.pathname.replace("/benchmark/", "").replace(/\/$/, "");
+      if (!serverSlug) {
+        return new Response(JSON.stringify({ error: "server slug required. Usage: /benchmark/{server-name}" }), {
+          status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      const serverUrl = `https://${serverSlug}.sgdata.workers.dev/mcp`;
+      const BENCH_COLS = "id, url, name, category, trust_score, static_score, total_calls, successful_calls, avg_latency_ms, p95_latency_ms, first_seen, last_checked";
+      let srv = await db.prepare(
+        `SELECT ${BENCH_COLS} FROM servers WHERE url = ? LIMIT 1`
+      ).bind(serverUrl).first();
+      if (!srv) {
+        srv = await db.prepare(
+          `SELECT ${BENCH_COLS} FROM servers WHERE url LIKE ? OR LOWER(name) LIKE ? LIMIT 1`
+        ).bind(`%${serverSlug}%`, `%${serverSlug}%`).first();
+      }
+      if (!srv) {
+        return new Response(JSON.stringify({
+          found: false,
+          server_slug: serverSlug,
+          message: "Server not tracked by Observatory. Register via POST /api/register.",
+          claim_uri: `${url.origin}/.well-known/mcp-observatory`
+        }), {
+          status: 404, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      const snapshots = await db.prepare(
+        "SELECT date, total_calls, successful_calls, avg_latency_ms, trust_score FROM daily_snapshots WHERE server_id = ? ORDER BY date DESC LIMIT 30"
+      ).bind(srv.id).all();
+      const snapshotRows = snapshots.results || [];
+      const score = Math.round((srv.trust_score || 0) * 10) / 10;
+      const trustGrade = score >= 90 ? "A" : score >= 75 ? "B" : score >= 60 ? "C" : score >= 40 ? "D" : "F";
+      const verdict = score >= 75 ? "recommended" : score >= 50 ? "use_with_caution" : "avoid";
+      const snapshots7d = snapshotRows.slice(0, 7);
+      const calcSuccessRate = (rows) => {
+        const totals = rows.reduce((a, r) => ({ calls: a.calls + (r.total_calls || 0), success: a.success + (r.successful_calls || 0) }), { calls: 0, success: 0 });
+        return totals.calls > 0 ? Math.round(totals.success / totals.calls * 1000) / 10 : null;
+      };
+      const calcAvgLatency = (rows) => {
+        const valid = rows.filter((r) => r.avg_latency_ms > 0);
+        return valid.length > 0 ? Math.round(valid.reduce((a, r) => a + r.avg_latency_ms, 0) / valid.length) : null;
+      };
+      const successRateAlltime = (srv.total_calls || 0) > 0 ? Math.round((srv.successful_calls || 0) / srv.total_calls * 1000) / 10 : null;
+      const trend = snapshotRows.length >= 2
+        ? snapshotRows[0].trust_score > snapshotRows[snapshotRows.length - 1].trust_score ? "improving"
+        : snapshotRows[0].trust_score < snapshotRows[snapshotRows.length - 1].trust_score ? "declining" : "stable"
+        : "insufficient_data";
+      return new Response(JSON.stringify({
+        benchmark_version: "1.0",
+        server_slug: serverSlug,
+        server_url: srv.url,
+        name: srv.name,
+        category: srv.category || "uncategorized",
+        trust_score: score,
+        trust_grade: trustGrade,
+        verdict,
+        reliability: {
+          success_rate_7d: calcSuccessRate(snapshots7d),
+          success_rate_30d: calcSuccessRate(snapshotRows),
+          success_rate_alltime: successRateAlltime,
+          trend
+        },
+        latency: {
+          avg_ms: srv.avg_latency_ms ? Math.round(srv.avg_latency_ms) : null,
+          p95_ms: srv.p95_latency_ms ? Math.round(srv.p95_latency_ms) : null,
+          avg_7d_ms: calcAvgLatency(snapshots7d)
+        },
+        volume: {
+          total_calls: srv.total_calls || 0,
+          snapshot_days: snapshotRows.length
+        },
+        data_since: srv.first_seen || null,
+        last_updated: srv.last_checked || null,
+        paid_tier_url: `${url.origin}/agent-query/${serverSlug}`,
+        claim_uri: `${url.origin}/.well-known/mcp-observatory`,
+        observatory: "https://dominion-observatory.sgdata.workers.dev/mcp"
+      }), {
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+          "Cache-Control": "public, max-age=300"
         }
       });
     }

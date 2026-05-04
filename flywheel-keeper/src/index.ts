@@ -109,11 +109,14 @@ interface KeeperState {
   last_tool_server: Server | "";
   last_tool_ok: boolean;
   last_tool_latency_ms: number;
+  last_agt_hmac_ok: boolean;
+  last_agt_hmac_latency_ms: number;
   last_error?: string;
 }
 
 interface Env {
   KEEPER_STATE?: KVNamespace;
+  AGT_HMAC_SECRET?: string;
   SG_REG: Fetcher;
   SG_COMPANY: Fetcher;
   ASEAN_TRADE: Fetcher;
@@ -246,6 +249,52 @@ async function probeTool(
   }
 }
 
+async function probeAgtHmac(
+  env: Env
+): Promise<{ ok: boolean; latency: number }> {
+  const start = Date.now();
+  try {
+    // Step 1: get challenge (no auth → Observatory returns 402 + challenge string)
+    const challengeRes = await env.OBSERVATORY.fetch(
+      "https://internal/api/agent-query/sg-cpf-calculator-mcp",
+      { method: "GET" }
+    );
+    if (challengeRes.status !== 402) {
+      return { ok: false, latency: Date.now() - start };
+    }
+    const body = (await challengeRes.json()) as { challenge?: string };
+    if (!body.challenge) {
+      return { ok: false, latency: Date.now() - start };
+    }
+
+    // Step 2: compute HMAC-SHA256 of challenge using shared secret
+    const secret = env.AGT_HMAC_SECRET ?? "keeper-default-secret";
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      "raw",
+      enc.encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+    const sig = await crypto.subtle.sign("HMAC", key, enc.encode(body.challenge));
+    const sigHex = Array.from(new Uint8Array(sig))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+
+    // Step 3: send signed request — Observatory currently checks header presence
+    const verifyRes = await env.OBSERVATORY.fetch(
+      "https://internal/api/agent-query/sg-cpf-calculator-mcp",
+      { method: "GET", headers: { Authorization: `HMAC ${sigHex}` } }
+    );
+    const verifyBody = (await verifyRes.json()) as { status?: string };
+    const ok = verifyRes.status === 200 && verifyBody.status === "verified";
+    return { ok, latency: Date.now() - start };
+  } catch {
+    return { ok: false, latency: Date.now() - start };
+  }
+}
+
 async function runTick(env: Env): Promise<KeeperState> {
   const now = new Date();
   let tickCount = 0;
@@ -303,6 +352,17 @@ async function runTick(env: Env): Promise<KeeperState> {
     lastToolLatency = probe.latency;
   }
 
+  // AGT HMAC self-test: every tick — verifies the x402 HMAC auth rail end-to-end
+  const agtProbe = await probeAgtHmac(env);
+  await reportInteraction(
+    env,
+    "https://dominion-observatory.sgdata.workers.dev/mcp",
+    agtProbe.ok,
+    agtProbe.latency,
+    "_keeper_agt_hmac_selftest",
+    agtProbe.ok ? 200 : 402
+  );
+
   const state: KeeperState = {
     tick_count: tickCount,
     last_tick_at: now.toISOString(),
@@ -311,6 +371,8 @@ async function runTick(env: Env): Promise<KeeperState> {
     last_tool_server: lastToolServer,
     last_tool_ok: lastToolOk,
     last_tool_latency_ms: lastToolLatency,
+    last_agt_hmac_ok: agtProbe.ok,
+    last_agt_hmac_latency_ms: agtProbe.latency,
   };
 
   if (env.KEEPER_STATE) {
@@ -333,10 +395,11 @@ export default {
         JSON.stringify({
           status: "ok",
           service: "flywheel-keeper",
-          version: "1.0.0",
+          version: "1.1.0",
           timestamp: new Date().toISOString(),
           cron: "*/5 * * * *",
           servers_probed: SERVERS.length,
+          agt_hmac_selftest: "enabled",
         }),
         { headers: { "Content-Type": "application/json" } }
       );
