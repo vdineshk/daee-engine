@@ -1,0 +1,39 @@
+name: Deploy Observatory (Builder routes)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'dominion-observatory/src/index.js'
+      - 'dominion-observatory/wrangler.toml'
+  schedule:
+    # Redeploy every 6 hours — recovers from Strategist deploy overwrites
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy Observatory
+        working-directory: dominion-observatory
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Verify EBTO health
+        run: |
+          sleep 15
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://dominion-observatory.sgdata.workers.dev/agent-query/sg-cpf-calculator-mcp)
+          [ "$STATUS" = "402" ] && echo "EBTO OK" || (echo "EBTO FAIL: $STATUS" && exit 1)
+
+      - name: Verify benchmark health
+        run: |
+          curl -s https://dominion-observatory.sgdata.workers.dev/benchmark/sg-cpf-calculator-mcp | grep -q "benchmark_version" && echo "BENCHMARK OK" || (echo "BENCHMARK FAIL" && exit 1)
+
+      - name: Verify llms.txt health
+        run: |
+          curl -s https://dominion-observatory.sgdata.workers.dev/llms.txt | grep -q "Dominion Observatory" && echo "LLMS.TXT OK" || (echo "LLMS.TXT FAIL" && exit 1)
