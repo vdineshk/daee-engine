@@ -80,3 +80,5 @@ Done. Verify: Strategist's next deploy preserves Builder's routes.
 This is P0 because every Strategist Observatory deploy will wipe Builder's EBTO routes until this PR is merged.
 
 [UNRECONCILED — pending next run]
+
+[RECONCILED-2026-05-05 RUN-024] Brain entries confirmed present via git grep. DAEE-Decisions write still pending (DB ID unknown). Observatory routes merged to comprehensive source in PR #21.
