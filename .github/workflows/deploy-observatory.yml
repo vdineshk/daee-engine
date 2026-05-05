@@ -14,12 +14,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Wrangler
+        run: npm install -g wrangler@4.87.0
+
       - name: Deploy Observatory
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: dominion-observatory
+        working-directory: dominion-observatory
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: wrangler deploy
 
       - name: Wait for propagation
         run: |
