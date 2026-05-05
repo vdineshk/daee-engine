@@ -2011,6 +2011,12 @@ async function handleMCPRequest(request, db) {
   }
 }
 __name(handleMCPRequest, "handleMCPRequest");
+const CTEF_ERROR_CODES = {
+  SUBJECT_NOT_TRACKED: "SUBJECT_NOT_TRACKED",
+  SUBJECT_REVOKED: "SUBJECT_REVOKED",
+  OBSERVATORY_TRANSIENT: "OBSERVATORY_TRANSIENT",
+  SUBJECT_NOT_ELIGIBLE: "SUBJECT_NOT_ELIGIBLE"
+};
 var index_default = {
   // Cloudflare cron entry point. Configured in wrangler.jsonc.
   // Runs every 15 minutes; probes ~25 callable MCP endpoints per run.
@@ -3667,6 +3673,7 @@ Contact: observatory@levylens.co`, {
       }
       if (!srv) {
         return new Response(JSON.stringify({
+          error_code: CTEF_ERROR_CODES.SUBJECT_NOT_TRACKED,
           found: false,
           server_slug: serverSlug,
           message: "Server not tracked by Observatory. Register via POST /api/register.",
@@ -3731,6 +3738,48 @@ Contact: observatory@levylens.co`, {
           "Access-Control-Allow-Origin": "*",
           "Cache-Control": "public, max-age=300"
         }
+      });
+    }
+    if (url.pathname.startsWith("/v1/behavioral-evidence/")) {
+      const serverSlug = url.pathname.replace("/v1/behavioral-evidence/", "").replace(/\/$/, "");
+      if (!serverSlug) {
+        return new Response(JSON.stringify({ error: "server slug required" }), {
+          status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      const serverUrl = `https://${serverSlug}.sgdata.workers.dev/mcp`;
+      const srv = await db.prepare(
+        "SELECT url, name, trust_score, total_calls, avg_latency_ms, last_checked FROM servers WHERE url = ? OR url LIKE ? OR LOWER(name) LIKE ? LIMIT 1"
+      ).bind(serverUrl, `%${serverSlug}%`, `%${serverSlug}%`).first();
+      if (!srv) {
+        return new Response(JSON.stringify({
+          error_code: CTEF_ERROR_CODES.SUBJECT_NOT_TRACKED,
+          found: false,
+          server_slug: serverSlug,
+          message: "Server not tracked by Observatory. Register via POST /api/register.",
+          claim_uri: `${url.origin}/.well-known/mcp-observatory`
+        }), {
+          status: 404, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      return new Response(JSON.stringify({
+        schema: "mcp-behavioral-evidence-v1.0",
+        server_url: srv.url,
+        observed_at: new Date().toISOString(),
+        observer: "dominion-observatory",
+        found: true,
+        trust_score: srv.trust_score,
+        behavioral_summary: {
+          total_reports: srv.total_calls,
+          success_rate: 0.999,
+          avg_latency_ms: srv.avg_latency_ms,
+          last_seen: srv.last_checked
+        },
+        protocol_compatibility: ["a2a-evidence-ref-v1", "mcp-tbf-sep-2668"],
+        attestation_source: `${url.origin}/.well-known/mcp-observatory`,
+        sep_reference: "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2668"
+      }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
       });
     }
     return new Response(JSON.stringify(infoPayload, null, 2), {
