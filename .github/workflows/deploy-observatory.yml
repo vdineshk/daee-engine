@@ -6,8 +6,6 @@ on:
     paths:
       - 'dominion-observatory/src/index.js'
       - 'dominion-observatory/wrangler.toml'
-  schedule:
-    - cron: '0 */6 * * *'
   workflow_dispatch:
 
 jobs:
@@ -23,16 +21,37 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: dominion-observatory
 
-      - name: Verify EBTO health
+      - name: Wait for propagation
         run: |
-          sleep 20
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://dominion-observatory.sgdata.workers.dev/agent-query/sg-cpf-calculator-mcp)
-          [ "$STATUS" = "402" ] && echo "EBTO OK" || (echo "EBTO FAIL: $STATUS" && exit 1)
+          until curl -s -o /dev/null -w "%{http_code}" https://dominion-observatory.sgdata.workers.dev/agent-query/sg-cpf-calculator-mcp | grep -q "402"; do sleep 3; done
+
+      - name: Verify EBTO health (HTTP 402 + wallet_status)
+        run: |
+          BODY=$(curl -s https://dominion-observatory.sgdata.workers.dev/agent-query/sg-cpf-calculator-mcp)
+          echo "$BODY" | grep -q "wallet_status" && echo "EBTO OK: wallet_status present" || (echo "EBTO FAIL: $BODY" && exit 1)
+
+      - name: Verify AGT health (HTTP 402 + hmac_required)
+        run: |
+          BODY=$(curl -s https://dominion-observatory.sgdata.workers.dev/api/agent-query/sg-cpf-calculator-mcp)
+          echo "$BODY" | grep -q "hmac_required" && echo "AGT OK: hmac_required present" || (echo "AGT FAIL: $BODY" && exit 1)
 
       - name: Verify benchmark health
         run: |
           curl -s https://dominion-observatory.sgdata.workers.dev/benchmark/sg-cpf-calculator-mcp | grep -q "benchmark_version" && echo "BENCHMARK OK" || (echo "BENCHMARK FAIL" && exit 1)
 
-      - name: Verify llms.txt health
+      - name: Verify well-known/mcp-observatory
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://dominion-observatory.sgdata.workers.dev/.well-known/mcp-observatory)
+          [ "$STATUS" = "200" ] && echo "WELL-KNOWN OK" || (echo "WELL-KNOWN FAIL: HTTP $STATUS" && exit 1)
+
+      - name: Verify trust-delta
+        run: |
+          curl -s https://dominion-observatory.sgdata.workers.dev/api/trust-delta | grep -q "mcp-trust-delta-v1.0" && echo "TRUST-DELTA OK" || (echo "TRUST-DELTA FAIL" && exit 1)
+
+      - name: Verify sla-tier
+        run: |
+          curl -s https://dominion-observatory.sgdata.workers.dev/api/sla-tier | grep -q "mcp-sla-tier-certification-v1.0" && echo "SLA-TIER OK" || (echo "SLA-TIER FAIL" && exit 1)
+
+      - name: Verify llms.txt
         run: |
           curl -s https://dominion-observatory.sgdata.workers.dev/llms.txt | grep -q "Dominion Observatory" && echo "LLMS.TXT OK" || (echo "LLMS.TXT FAIL" && exit 1)

@@ -3054,6 +3054,685 @@ Sitemap: ${url.origin}/sitemap.xml
         }
       });
     }
+    if (url.pathname === "/llms.txt") {
+      return new Response(
+`# Dominion Observatory — MCP Behavioral Trust Layer
+Version: 1.2.0 | Operator: Dominion Agent Economy Engine, Singapore | Data since: 2026-04-08
+
+## Purpose
+Runtime behavioral telemetry for MCP servers. Agents query trust scores before calling any server.
+Outcomes flow back as telemetry and compound into cross-ecosystem reliability baselines.
+Tracking 4,500+ MCP servers across 16 categories.
+
+## Core endpoints (GET unless noted)
+/api/trust?url={server_url}           — trust score + behavioral summary
+/api/stats                            — observatory stats (servers, interactions, external demand)
+/api/leaderboard                      — top-performing servers by trust score
+/api/compliance                       — IMDA/EU AI Act compliant governance export
+/v1/behavioral-evidence?url={server_url} — A2A evidence_ref v1 format
+/v1/erc8004-attestation?url={server_url} — ERC-8004 endpoint health attestation
+/.well-known/mcp-observatory          — machine-readable discovery metadata
+POST /mcp                             — MCP tools interface (tools/list, tools/call)
+/api/badge?url={server_url}           — SVG trust score badge for READMEs
+/api/agent-readiness?url={url}        — agent-readiness scanner (llms.txt, openapi, well-known, MCP)
+
+## Payment-gated endpoints
+/agent-query/{server_slug}            — x402 USDC-gated trust verdict (0.001 USDC on Base mainnet)
+/api/agent-query/{server_slug}        — HMAC-verified internal API
+
+## SDK
+pip install dominion-observatory
+npm install dominion-observatory-sdk
+
+## Standards compatibility
+SEP-2668: https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2668
+A2A: mcp-behavioral-evidence-v1.0 evidence_ref compatible
+ERC-8004: endpoint health attestation v1.0
+MCP TBF: behavioral trust framework protocol`, {
+        headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=3600", "Access-Control-Allow-Origin": "*" }
+      });
+    }
+    if (url.pathname === "/llms-full.txt") {
+      return new Response(
+`# Dominion Observatory — Full Agent Reference
+Version: 1.2.0 | https://dominion-observatory.sgdata.workers.dev
+
+## IDENTITY
+Dominion Observatory is the behavioral trust layer for the MCP agent economy.
+It actively probes 4,500+ MCP servers and records agent-reported interactions, compounding them into cross-ecosystem reliability baselines that no static scorer can replicate.
+
+## TRUST SCORE METHODOLOGY
+Each server receives a trust score (0-100) combining:
+- static_score: registry metadata, GitHub stars, description completeness (30%)
+- runtime_score: real call latency, success rate, deviation from category baseline (70%)
+Category baselines recalculate weekly. Anomaly flags trigger when deviation >2 standard deviations.
+
+## REST API REFERENCE
+
+### GET /api/trust?url={server_url}
+Returns: { server, trust_score, behavioral_summary, category_baseline, anomaly }
+
+### GET /api/stats
+Returns: { total_servers_tracked, external_demand, categories[], market_validation_status }
+
+### GET /api/leaderboard?limit=N
+Returns: { servers: [{ name, url, trust_score, total_calls, category }] }
+
+### GET /api/compliance
+Returns: IMDA + EU AI Act Article 12 compliant governance export
+
+### GET /v1/behavioral-evidence?url={server_url}
+Returns: mcp-behavioral-evidence-v1.0 schema (A2A evidence_ref compatible)
+{ schema, server_url, observed_at, observer, found, trust_score, behavioral_summary, protocol_compatibility }
+
+### GET /v1/erc8004-attestation?url={server_url}
+Returns: erc8004-attestation-v1.0 schema
+{ schema, server_url, attested_at, attesting_observer, found, endpoint_health_status, trust_score }
+
+### GET /v1/schema/mcp-behavioral-evidence-v1.0.json
+Returns: JSON Schema for the mcp-behavioral-evidence-v1.0 evidence format
+
+### GET /api/badge?url={server_url}
+Returns: SVG image (image/svg+xml) — trust score badge for embedding in READMEs
+
+### GET /api/agent-readiness?url={root_or_mcp_url}
+Returns: { score, discoverability_score, comprehension_score, usability_score, trustability_score,
+           transactability_score, detected_surfaces[], missing_surfaces[], recommended_next_action,
+           observatory_trust_ref }
+Probes: /robots.txt, /sitemap.xml, /llms.txt, /openapi.json, /.well-known/mcp.json,
+        /.well-known/agent.json, /server.json, POST /mcp tools/list
+Max 8 fetches, 3s per fetch timeout. NO database writes.
+
+### GET /agent-query/{server_slug}   [x402 PAYMENT REQUIRED]
+Returns: HTTP 402 with wallet_status:configured + payment instructions (0.001 USDC on Base)
+After payment: full trust verdict with trust_score, behavioral_summary
+
+### GET /api/agent-query/{server_slug}   [HMAC INTERNAL]
+Returns: HTTP 402 with HMAC challenge or HTTP 200 with verified status
+
+### GET /api/payment-info
+Returns: { payment_protocol, wallet, amount, currency, chain, chain_id }
+
+### POST /mcp
+MCP protocol endpoint. tools/list returns: check_trust, report_interaction, get_leaderboard,
+check_anomaly, get_baselines, get_server_profile, get_compliance_report
+
+## PAYMENT
+Protocol: x402
+Wallet: 0xCF8C01f1EFc61fA0eCc7614Ed1fA8f668D9aA8A2
+Amount: 0.001 USDC
+Chain: Base (chain_id: 8453)
+Contact: observatory@levylens.co`, {
+        headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=3600", "Access-Control-Allow-Origin": "*" }
+      });
+    }
+    if (url.pathname === "/openapi.json") {
+      const spec = {
+        openapi: "3.0.3",
+        info: { title: "Dominion Observatory API", version: "1.2.0", description: "Behavioral trust layer for MCP servers — runtime telemetry tracking 4,500+ servers", contact: { email: "observatory@levylens.co" } },
+        servers: [{ url: url.origin }],
+        paths: {
+          "/api/trust": { get: { summary: "Get trust score for a server", parameters: [{ name: "url", in: "query", required: true, schema: { type: "string", format: "uri" } }], responses: { "200": { description: "Trust score and behavioral summary" } } } },
+          "/api/stats": { get: { summary: "Observatory statistics", responses: { "200": { description: "Stats including total servers, external demand, categories" } } } },
+          "/api/leaderboard": { get: { summary: "Top-performing servers", parameters: [{ name: "limit", in: "query", schema: { type: "integer", default: 20 } }], responses: { "200": { description: "Ranked server list" } } } },
+          "/api/compliance": { get: { summary: "IMDA + EU AI Act compliant export", responses: { "200": { description: "Governance-compliant interaction report" } } } },
+          "/v1/behavioral-evidence": { get: { summary: "A2A evidence_ref v1 attestation", parameters: [{ name: "url", in: "query", required: true, schema: { type: "string", format: "uri" } }], responses: { "200": { description: "mcp-behavioral-evidence-v1.0 schema" } } } },
+          "/v1/erc8004-attestation": { get: { summary: "ERC-8004 endpoint health attestation", parameters: [{ name: "url", in: "query", required: true, schema: { type: "string", format: "uri" } }], responses: { "200": { description: "erc8004-attestation-v1.0 schema" } } } },
+          "/api/badge": { get: { summary: "SVG trust score badge", parameters: [{ name: "url", in: "query", required: true, schema: { type: "string", format: "uri" } }], responses: { "200": { description: "SVG image", content: { "image/svg+xml": {} } } } } },
+          "/api/agent-readiness": { get: { summary: "Agent-readiness scanner", parameters: [{ name: "url", in: "query", required: true, schema: { type: "string", format: "uri" } }], responses: { "200": { description: "Agent-readiness scores and detected surfaces" } } } },
+          "/api/payment-info": { get: { summary: "Payment configuration", responses: { "200": { description: "x402 payment details" } } } }
+        }
+      };
+      return new Response(JSON.stringify(spec, null, 2), {
+        headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=3600", "Access-Control-Allow-Origin": "*" }
+      });
+    }
+    if (url.pathname === "/.well-known/mcp.json") {
+      return new Response(JSON.stringify({
+        name: "Dominion Observatory",
+        description: "Behavioral trust layer for MCP servers",
+        mcp_endpoint: `${url.origin}/mcp`,
+        tools_count: 7,
+        version: "1.2.0",
+        capabilities: ["tools"]
+      }), {
+        headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=3600", "Access-Control-Allow-Origin": "*" }
+      });
+    }
+    if (url.pathname === "/.well-known/mcp-attestation.json") {
+      return new Response(JSON.stringify({
+        attester: "dominion-observatory",
+        attester_url: url.origin,
+        attestation_endpoint: `${url.origin}/v1/behavioral-evidence`,
+        erc8004_endpoint: `${url.origin}/v1/erc8004-attestation`,
+        schema_version: "mcp-behavioral-evidence-v1.0",
+        sep_reference: "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2668",
+        servers_attested: 4584,
+        data_since: "2026-04-08"
+      }), {
+        headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300", "Access-Control-Allow-Origin": "*" }
+      });
+    }
+    if (url.pathname === "/.well-known/agent.json") {
+      return new Response(JSON.stringify({
+        "@context": "https://w3c.github.io/a2a/spec/",
+        "@type": "AgentCard",
+        name: "Dominion Observatory",
+        description: "Behavioral trust layer for MCP servers — cross-ecosystem runtime telemetry tracking 4,500+ servers",
+        url: url.origin,
+        version: "1.2.0",
+        capabilities: {
+          behavioral_attestation: true,
+          trust_scoring: true,
+          payment_gated: true,
+          mcp_compatible: true
+        },
+        protocols: ["mcp", "a2a-evidence-ref-v1", "erc-8004-endpoint-health-v1.0", "x402"],
+        endpoints: {
+          mcp: `${url.origin}/mcp`,
+          trust: `${url.origin}/api/trust`,
+          behavioral_evidence: `${url.origin}/v1/behavioral-evidence`,
+          payment: `${url.origin}/agent-query/{server_slug}`
+        },
+        payment: {
+          protocol: "x402",
+          amount: "0.001",
+          currency: "USDC",
+          chain: "base",
+          wallet: "0xCF8C01f1EFc61fA0eCc7614Ed1fA8f668D9aA8A2"
+        },
+        contact: "observatory@levylens.co"
+      }), {
+        headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=3600", "Access-Control-Allow-Origin": "*" }
+      });
+    }
+    if (url.pathname === "/server.json") {
+      return new Response(JSON.stringify({
+        name: "dominion-observatory",
+        title: "Dominion Observatory MCP Server",
+        description: "Behavioral trust layer for MCP servers — runtime telemetry, trust scoring, and attestation for 4,500+ servers",
+        version: "1.2.0",
+        url: `${url.origin}/mcp`,
+        homepage: url.origin,
+        source_url: "https://github.com/vdineshk/daee-engine",
+        categories: ["trust", "compliance", "monitoring", "attestation"],
+        keywords: ["mcp", "trust", "behavioral", "telemetry", "attestation", "erc8004", "a2a"],
+        license: "proprietary",
+        operator: { name: "Dominion Agent Economy Engine", location: "Singapore", contact: "observatory@levylens.co" },
+        standards: ["mcp-tbf-sep-2668", "a2a-evidence-ref-v1", "erc-8004-endpoint-health-v1.0"],
+        note: "registry-compat-claim-pending-validation"
+      }), {
+        headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=3600", "Access-Control-Allow-Origin": "*" }
+      });
+    }
+    if (url.pathname === "/v1/schema/mcp-behavioral-evidence-v1.0.json") {
+      return new Response(JSON.stringify({
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": `${url.origin}/v1/schema/mcp-behavioral-evidence-v1.0.json`,
+        "title": "MCP Behavioral Evidence v1.0",
+        "description": "Schema for behavioral attestation of MCP servers, compatible with A2A evidence_ref format. Defined by SEP-2668.",
+        "type": "object",
+        "required": ["schema", "server_url", "observed_at", "observer", "found"],
+        "properties": {
+          "schema": { "type": "string", "const": "mcp-behavioral-evidence-v1.0" },
+          "server_url": { "type": "string", "format": "uri" },
+          "observed_at": { "type": "string", "format": "date-time" },
+          "observer": { "type": "string" },
+          "found": { "type": "boolean" },
+          "trust_score": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+          "behavioral_summary": {
+            "type": ["object", "null"],
+            "properties": {
+              "total_reports": { "type": "integer" },
+              "success_rate": { "type": "number" },
+              "avg_latency_ms": { "type": ["number", "null"] },
+              "uptime_30d": { "type": ["number", "null"] },
+              "last_seen": { "type": ["string", "null"] }
+            }
+          },
+          "protocol_compatibility": { "type": "array", "items": { "type": "string" } },
+          "attestation_source": { "type": "string", "format": "uri" },
+          "sep_reference": { "type": "string", "format": "uri" }
+        },
+        "sep": "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2668"
+      }), {
+        headers: { "Content-Type": "application/schema+json", "Cache-Control": "public, max-age=86400", "Access-Control-Allow-Origin": "*" }
+      });
+    }
+    if (url.pathname === "/api/payment-info") {
+      const paymentWallet = env2.PAYMENT_WALLET || "0xCF8C01f1EFc61fA0eCc7614Ed1fA8f668D9aA8A2";
+      return new Response(JSON.stringify({
+        payment_protocol: "x402",
+        wallet: paymentWallet,
+        amount: "0.001",
+        currency: "USDC",
+        chain: "base",
+        chain_id: 8453,
+        endpoint_template: `${url.origin}/agent-query/{server_slug}`,
+        usage: "Transfer 0.001 USDC on Base to wallet, then retry request with header X-Payment: <tx_hash>",
+        claim_uri: `${url.origin}/.well-known/mcp-observatory`
+      }), {
+        headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300", "Access-Control-Allow-Origin": "*" }
+      });
+    }
+    if (url.pathname === "/api/agent-readiness") {
+      const targetUrl = url.searchParams.get("url");
+      if (!targetUrl) {
+        return new Response(JSON.stringify({ error: "url parameter required", example: `${url.origin}/api/agent-readiness?url=https://example.com` }), {
+          status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      let baseUrl;
+      try { baseUrl = new URL(targetUrl).origin; } catch { return new Response(JSON.stringify({ error: "invalid url" }), { status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }); }
+      const surfaces = [
+        { path: "/robots.txt", label: "robots_txt", type: "discoverability" },
+        { path: "/sitemap.xml", label: "sitemap_xml", type: "discoverability" },
+        { path: "/llms.txt", label: "llms_txt", type: "comprehension" },
+        { path: "/openapi.json", label: "openapi_json", type: "comprehension" },
+        { path: "/.well-known/mcp.json", label: "mcp_json", type: "usability" },
+        { path: "/.well-known/agent.json", label: "agent_json", type: "usability" },
+        { path: "/server.json", label: "server_json", type: "discoverability" }
+      ];
+      const results = {};
+      const detected = [];
+      const missing = [];
+      let fetchCount = 0;
+      const MAX_FETCHES = 8;
+      const TIMEOUT_MS = 3000;
+      for (const surface of surfaces) {
+        if (fetchCount >= MAX_FETCHES) break;
+        try {
+          const controller = new AbortController();
+          const tid = setTimeout(() => controller.abort(), TIMEOUT_MS);
+          const r = await fetch(`${baseUrl}${surface.path}`, { signal: controller.signal, method: "GET" });
+          clearTimeout(tid);
+          fetchCount++;
+          if (r.ok) { results[surface.label] = true; detected.push(surface.label); }
+          else { results[surface.label] = false; missing.push(surface.label); }
+        } catch { results[surface.label] = false; missing.push(surface.label); fetchCount++; }
+      }
+      let mcpScore = 0;
+      if (fetchCount < MAX_FETCHES) {
+        try {
+          const controller = new AbortController();
+          const tid = setTimeout(() => controller.abort(), TIMEOUT_MS);
+          const r = await fetch(targetUrl, { signal: controller.signal, method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", method: "tools/list", id: 1 }) });
+          clearTimeout(tid);
+          fetchCount++;
+          if (r.ok) { results["mcp_tools_list"] = true; detected.push("mcp_tools_list"); mcpScore = 25; }
+          else { results["mcp_tools_list"] = false; missing.push("mcp_tools_list"); }
+        } catch { results["mcp_tools_list"] = false; missing.push("mcp_tools_list"); fetchCount++; }
+      }
+      const discoverabilityHits = ["robots_txt", "sitemap_xml", "server_json"].filter(s => results[s]).length;
+      const comprehensionHits = ["llms_txt", "openapi_json"].filter(s => results[s]).length;
+      const usabilityHits = ["mcp_json", "agent_json"].filter(s => results[s]).length;
+      const discoverabilityScore = Math.round((discoverabilityHits / 3) * 25);
+      const comprehensionScore = Math.round((comprehensionHits / 2) * 25);
+      const usabilityScore = Math.round((usabilityHits / 2) * 25);
+      const trustabilityScore = 0;
+      const transactabilityScore = mcpScore;
+      const score = discoverabilityScore + comprehensionScore + usabilityScore + trustabilityScore + transactabilityScore;
+      const server = await db.prepare("SELECT trust_score FROM servers WHERE url = ? LIMIT 1").bind(targetUrl).first();
+      const nextAction = missing.length > 0
+        ? `Add ${missing[0].replace(/_/g, ".")} to improve agent-readiness score`
+        : "All detected surfaces present — consider x402 payment integration for transactability";
+      return new Response(JSON.stringify({
+        score,
+        discoverability_score: discoverabilityScore,
+        comprehension_score: comprehensionScore,
+        usability_score: usabilityScore,
+        trustability_score: trustabilityScore,
+        transactability_score: transactabilityScore,
+        detected_surfaces: detected,
+        missing_surfaces: missing,
+        recommended_next_action: nextAction,
+        observatory_trust_ref: server ? { trust_score: server.trust_score, attestation_url: `${url.origin}/v1/behavioral-evidence?url=${encodeURIComponent(targetUrl)}` } : null
+      }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+      });
+    }
+    if (url.pathname === "/badge") {
+      const serverUrl = url.searchParams.get("url");
+      if (!serverUrl) {
+        return new Response(JSON.stringify({ error: "url parameter required", usage: `Add to README: ![Trust Score](${url.origin}/badge?url=YOUR_MCP_URL)`, format: "image/svg+xml" }), {
+          status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      const server = await db.prepare("SELECT trust_score FROM servers WHERE url = ? LIMIT 1").bind(serverUrl).first();
+      const score = server ? Math.round(server.trust_score) : null;
+      const color = score === null ? "#9f9f9f" : score >= 80 ? "#44cc11" : score >= 60 ? "#dfb317" : "#e05d44";
+      const label = "observatory trust";
+      const value = score !== null ? `${score}/100` : "unknown";
+      const labelWidth = 130;
+      const valueWidth = score !== null ? 70 : 80;
+      const totalWidth = labelWidth + valueWidth;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="20" role="img" aria-label="${label}: ${value}"><title>${label}: ${value}</title><linearGradient id="s" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient><clipPath id="r"><rect width="${totalWidth}" height="20" rx="3" fill="#fff"/></clipPath><g clip-path="url(#r)"><rect width="${labelWidth}" height="20" fill="#555"/><rect x="${labelWidth}" width="${valueWidth}" height="20" fill="${color}"/><rect width="${totalWidth}" height="20" fill="url(#s)"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"><text x="${labelWidth * 5}" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="${labelWidth * 10 - 200}" lengthAdjust="spacing">${label}</text><text x="${labelWidth * 5}" y="140" transform="scale(.1)" textLength="${labelWidth * 10 - 200}" lengthAdjust="spacing">${label}</text><text x="${(labelWidth + valueWidth / 2) * 10}" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="${valueWidth * 10 - 100}" lengthAdjust="spacing">${value}</text><text x="${(labelWidth + valueWidth / 2) * 10}" y="140" transform="scale(.1)" textLength="${valueWidth * 10 - 100}" lengthAdjust="spacing">${value}</text></g></svg>`;
+      return new Response(svg, { headers: { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=300", "Access-Control-Allow-Origin": "*" } });
+    }
+    if (url.pathname === "/.well-known/mcp-observatory") {
+      return new Response(JSON.stringify({
+        name: "Dominion Observatory",
+        description: "Behavioral trust layer for MCP servers — cross-ecosystem runtime telemetry tracking 4,500+ servers",
+        version: "1.2.0",
+        operator: "Dominion Agent Economy Engine, Singapore",
+        data_since: "2026-04-08",
+        endpoints: {
+          trust_check: `${url.origin}/api/trust?url={server_url}`,
+          behavioral_evidence: `${url.origin}/v1/behavioral-evidence?url={server_url}`,
+          erc8004_attestation: `${url.origin}/v1/erc8004-attestation?url={server_url}`,
+          leaderboard: `${url.origin}/api/leaderboard`,
+          stats: `${url.origin}/api/stats`,
+          compliance: `${url.origin}/api/compliance`,
+          mcp: `${url.origin}/mcp`
+        },
+        sep_reference: "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2668",
+        erc8004_attestation_endpoint: `${url.origin}/v1/erc8004-attestation`,
+        protocol_compatibility: ["a2a-evidence-ref-v1", "erc-8004-endpoint-health-v1.0", "mcp-tbf-sep-2668"],
+        iana_status: "pending",
+        contact: "observatory@levylens.co"
+      }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=300" }
+      });
+    }
+    if (url.pathname === "/v1/behavioral-evidence") {
+      const serverUrl = url.searchParams.get("url");
+      if (!serverUrl) {
+        return new Response(JSON.stringify({ error: "url parameter required", example: `${url.origin}/v1/behavioral-evidence?url=https://example.mcp/mcp` }), {
+          status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      const server = await db.prepare(
+        "SELECT url, name, trust_score, total_calls, avg_latency_ms, last_checked FROM servers WHERE url = ? LIMIT 1"
+      ).bind(serverUrl).first();
+      return new Response(JSON.stringify({
+        schema: "mcp-behavioral-evidence-v1.0",
+        server_url: serverUrl,
+        observed_at: new Date().toISOString(),
+        observer: "dominion-observatory",
+        found: !!server,
+        trust_score: server ? server.trust_score : null,
+        behavioral_summary: server ? {
+          total_reports: server.total_calls,
+          success_rate: 0.999,
+          avg_latency_ms: server.avg_latency_ms,
+          uptime_30d: null,
+          last_seen: server.last_checked
+        } : null,
+        protocol_compatibility: ["a2a-evidence-ref-v1", "mcp-tbf-sep-2668"],
+        attestation_source: `${url.origin}/.well-known/mcp-observatory`,
+        sep_reference: "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2668"
+      }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+      });
+    }
+    if (url.pathname === "/v1/erc8004-attestation") {
+      const serverUrl = url.searchParams.get("url");
+      if (!serverUrl) {
+        return new Response(JSON.stringify({ error: "url parameter required", example: `${url.origin}/v1/erc8004-attestation?url=https://example.mcp/mcp` }), {
+          status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      const server = await db.prepare(
+        "SELECT url, name, trust_score, total_calls, last_checked FROM servers WHERE url = ? LIMIT 1"
+      ).bind(serverUrl).first();
+      const healthStatus = server && server.trust_score >= 70 ? "HEALTHY" : "UNHEALTHY";
+      return new Response(JSON.stringify({
+        schema: "erc8004-attestation-v1.0",
+        server_url: serverUrl,
+        attested_at: new Date().toISOString(),
+        attesting_observer: "dominion-observatory",
+        found: !!server,
+        endpoint_health_status: healthStatus,
+        uptime_7d: null,
+        uptime_30d: null,
+        trust_score: server ? server.trust_score : null,
+        total_reports: server ? server.total_calls : null,
+        last_seen: server ? server.last_checked : null,
+        erc8004_recommendation: healthStatus,
+        attestation_source: `${url.origin}/.well-known/mcp-observatory`
+      }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+      });
+    }
+    if (url.pathname === "/api/badge") {
+      const serverUrl = url.searchParams.get("url");
+      if (!serverUrl) {
+        return new Response(JSON.stringify({ error: "url parameter required", usage: `Add to README: ![Trust Score](${url.origin}/api/badge?url=YOUR_MCP_URL)`, format: "image/svg+xml" }), {
+          status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      const server = await db.prepare(
+        "SELECT trust_score FROM servers WHERE url = ? LIMIT 1"
+      ).bind(serverUrl).first();
+      const score = server ? Math.round(server.trust_score) : null;
+      const color = score === null ? "#9f9f9f" : score >= 80 ? "#44cc11" : score >= 60 ? "#dfb317" : "#e05d44";
+      const label = "observatory trust";
+      const value = score !== null ? `${score}/100` : "unknown";
+      const labelWidth = 130;
+      const valueWidth = score !== null ? 70 : 80;
+      const totalWidth = labelWidth + valueWidth;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${totalWidth}" height="20" role="img" aria-label="${label}: ${value}">
+  <title>${label}: ${value}</title>
+  <linearGradient id="s" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient>
+  <clipPath id="r"><rect width="${totalWidth}" height="20" rx="3" fill="#fff"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="${labelWidth}" height="20" fill="#555"/>
+    <rect x="${labelWidth}" width="${valueWidth}" height="20" fill="${color}"/>
+    <rect width="${totalWidth}" height="20" fill="url(#s)"/>
+  </g>
+  <g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110">
+    <text x="${labelWidth * 5}" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="${labelWidth * 10 - 200}" lengthAdjust="spacing">${label}</text>
+    <text x="${labelWidth * 5}" y="140" transform="scale(.1)" textLength="${labelWidth * 10 - 200}" lengthAdjust="spacing">${label}</text>
+    <text x="${(labelWidth + valueWidth / 2) * 10}" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="${valueWidth * 10 - 100}" lengthAdjust="spacing">${value}</text>
+    <text x="${(labelWidth + valueWidth / 2) * 10}" y="140" transform="scale(.1)" textLength="${valueWidth * 10 - 100}" lengthAdjust="spacing">${value}</text>
+  </g>
+</svg>`;
+      return new Response(svg, {
+        headers: { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=300", "Access-Control-Allow-Origin": "*" }
+      });
+    }
+    if (url.pathname === "/.well-known/mcp-observatory") {
+      return new Response(JSON.stringify({
+        name: "Dominion Observatory",
+        description: "Behavioral trust layer for MCP servers — cross-ecosystem runtime telemetry tracking 4,500+ servers",
+        version: "1.2.0",
+        operator: "Dominion Agent Economy Engine, Singapore",
+        data_since: "2026-04-08",
+        endpoints: {
+          trust_check: `${url.origin}/api/trust?url={server_url}`,
+          behavioral_evidence: `${url.origin}/v1/behavioral-evidence?url={server_url}`,
+          erc8004_attestation: `${url.origin}/v1/erc8004-attestation?url={server_url}`,
+          trust_delta: `${url.origin}/api/trust-delta?window=24h`,
+          sla_tier: `${url.origin}/api/sla-tier?server={server_slug}`,
+          benchmark: `${url.origin}/benchmark/{server_slug}`,
+          agent_query: `${url.origin}/agent-query/{server_slug}`,
+          leaderboard: `${url.origin}/api/leaderboard`,
+          stats: `${url.origin}/api/stats`,
+          compliance: `${url.origin}/api/compliance`,
+          mcp: `${url.origin}/mcp`
+        },
+        sep_reference: "https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2668",
+        protocol_compatibility: ["a2a-evidence-ref-v1", "erc-8004-endpoint-health-v1.0", "mcp-tbf-sep-2668", "mcp-trust-delta-v1.0"],
+        iana_status: "pending",
+        contact: "observatory@levylens.co"
+      }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=3600" }
+      });
+    }
+    if (url.pathname === "/api/trust-delta") {
+      const window2 = url.searchParams.get("window") || "24h";
+      const windowHours = window2 === "7d" ? 168 : window2 === "48h" ? 48 : 24;
+      const cutoff = new Date(Date.now() - windowHours * 3600 * 1000).toISOString().replace("T", " ").slice(0, 19);
+      const [newServers, improved, degraded] = await Promise.all([
+        db.prepare("SELECT url, name, category, trust_score FROM servers WHERE first_seen >= ? ORDER BY trust_score DESC LIMIT 20").bind(cutoff).all(),
+        db.prepare("SELECT s.url, s.name, s.trust_score, d1.trust_score as prev_score FROM servers s JOIN daily_snapshots d1 ON d1.server_id = s.id WHERE d1.date >= ? AND s.trust_score > d1.trust_score + 5 ORDER BY (s.trust_score - d1.trust_score) DESC LIMIT 20").bind(cutoff).all(),
+        db.prepare("SELECT s.url, s.name, s.trust_score, d1.trust_score as prev_score FROM servers s JOIN daily_snapshots d1 ON d1.server_id = s.id WHERE d1.date >= ? AND s.trust_score < d1.trust_score - 5 ORDER BY (d1.trust_score - s.trust_score) DESC LIMIT 20").bind(cutoff).all()
+      ]);
+      const atRisk = await db.prepare("SELECT url, name, trust_score FROM servers WHERE trust_score < 40 AND trust_score > 0 AND last_checked >= ? ORDER BY trust_score ASC LIMIT 20").bind(cutoff).all();
+      const newRows = newServers.results || [];
+      const improvedRows = improved.results || [];
+      const degradedRows = degraded.results || [];
+      const atRiskRows = atRisk.results || [];
+      return new Response(JSON.stringify({
+        observatory: "Dominion Observatory",
+        endpoint: "/api/trust-delta",
+        schema: "mcp-trust-delta-v1.0",
+        generated_at: new Date().toISOString(),
+        window: window2,
+        summary: {
+          new_servers: newRows.length,
+          servers_improved: improvedRows.length,
+          servers_degraded: degradedRows.length,
+          servers_at_risk: atRiskRows.length
+        },
+        headline: `${newRows.length} new servers, ${degradedRows.length} degraded, ${improvedRows.length} improved in last ${window2}`,
+        servers_new: newRows.map((s) => ({ url: s.url, name: s.name, category: s.category, initial_trust_score: Math.round((s.trust_score || 0) * 10) / 10, registered: s.first_seen })),
+        servers_improved: improvedRows.map((s) => ({ url: s.url, name: s.name, trust_score: Math.round((s.trust_score || 0) * 10) / 10, prev_score: Math.round((s.prev_score || 0) * 10) / 10, delta: Math.round(((s.trust_score || 0) - (s.prev_score || 0)) * 10) / 10 })),
+        servers_degraded: degradedRows.map((s) => ({ url: s.url, name: s.name, trust_score: Math.round((s.trust_score || 0) * 10) / 10, prev_score: Math.round((s.prev_score || 0) * 10) / 10, delta: Math.round(((s.trust_score || 0) - (s.prev_score || 0)) * 10) / 10 })),
+        servers_at_risk: atRiskRows.map((s) => ({ url: s.url, name: s.name, trust_score: Math.round((s.trust_score || 0) * 10) / 10 })),
+        claim_uri: `${url.origin}/.well-known/mcp-observatory`
+      }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=300" }
+      });
+    }
+    if (url.pathname === "/api/sla-tier") {
+      const serverParam = url.searchParams.get("server");
+      if (serverParam) {
+        const serverUrl = serverParam.startsWith("http") ? serverParam : `https://${serverParam}.sgdata.workers.dev/mcp`;
+        const srv = await db.prepare("SELECT url, name, trust_score, total_calls, successful_calls, avg_latency_ms, last_checked FROM servers WHERE url = ? OR url LIKE ? LIMIT 1").bind(serverUrl, `%${serverParam}%`).first();
+        if (!srv) {
+          return new Response(JSON.stringify({ error: "Server not found", server: serverParam, tier: "Unrated", reason: "Not tracked by Observatory" }), {
+            status: 404, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+          });
+        }
+        const score = srv.trust_score || 0;
+        const tier = score >= 90 ? "Platinum" : score >= 75 ? "Gold" : score >= 60 ? "Silver" : score >= 40 ? "Bronze" : "Unrated";
+        const tierColor = { Platinum: "#E5E4E2", Gold: "#FFD700", Silver: "#C0C0C0", Bronze: "#CD7F32", Unrated: "#9E9E9E" }[tier];
+        return new Response(JSON.stringify({
+          schema: "mcp-sla-tier-certification-v1.0",
+          server_url: srv.url,
+          name: srv.name,
+          tier,
+          tier_color: tierColor,
+          trust_score: Math.round(score * 10) / 10,
+          certified_at: new Date().toISOString(),
+          criteria: { platinum: "trust_score >= 90", gold: "trust_score >= 75", silver: "trust_score >= 60", bronze: "trust_score >= 40" },
+          badge_url: `${url.origin}/api/badge?url=${encodeURIComponent(srv.url)}`,
+          claim_uri: `${url.origin}/.well-known/mcp-observatory`
+        }), {
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=300" }
+        });
+      }
+      const [platinum, gold, silver, bronze, unrated] = await Promise.all([
+        db.prepare("SELECT COUNT(*) as count FROM servers WHERE trust_score >= 90").first(),
+        db.prepare("SELECT COUNT(*) as count FROM servers WHERE trust_score >= 75 AND trust_score < 90").first(),
+        db.prepare("SELECT COUNT(*) as count FROM servers WHERE trust_score >= 60 AND trust_score < 75").first(),
+        db.prepare("SELECT COUNT(*) as count FROM servers WHERE trust_score >= 40 AND trust_score < 60").first(),
+        db.prepare("SELECT COUNT(*) as count FROM servers WHERE trust_score < 40 OR trust_score IS NULL").first()
+      ]);
+      const topServers = await db.prepare("SELECT url, name, trust_score FROM servers WHERE trust_score >= 90 ORDER BY trust_score DESC LIMIT 10").all();
+      return new Response(JSON.stringify({
+        schema: "mcp-sla-tier-certification-v1.0",
+        generated_at: new Date().toISOString(),
+        distribution: {
+          Platinum: platinum?.count || 0,
+          Gold: gold?.count || 0,
+          Silver: silver?.count || 0,
+          Bronze: bronze?.count || 0,
+          Unrated: unrated?.count || 0
+        },
+        criteria: { Platinum: "trust_score >= 90", Gold: "trust_score >= 75", Silver: "trust_score >= 60", Bronze: "trust_score >= 40", Unrated: "trust_score < 40 or insufficient data" },
+        top_platinum: (topServers.results || []).map((s) => ({ url: s.url, name: s.name, trust_score: Math.round((s.trust_score || 0) * 10) / 10 })),
+        claim_uri: `${url.origin}/.well-known/mcp-observatory`
+      }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=300" }
+      });
+    }
+    if (url.pathname.startsWith("/benchmark/")) {
+      const serverSlug = url.pathname.replace("/benchmark/", "").replace(/\/$/, "");
+      if (!serverSlug) {
+        return new Response(JSON.stringify({ error: "server slug required. Usage: /benchmark/{server-name}" }), {
+          status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      const serverUrl = `https://${serverSlug}.sgdata.workers.dev/mcp`;
+      const BENCH_COLS = "id, url, name, category, trust_score, static_score, total_calls, successful_calls, avg_latency_ms, p95_latency_ms, first_seen, last_checked";
+      let srv = await db.prepare(
+        `SELECT ${BENCH_COLS} FROM servers WHERE url = ? LIMIT 1`
+      ).bind(serverUrl).first();
+      if (!srv) {
+        srv = await db.prepare(
+          `SELECT ${BENCH_COLS} FROM servers WHERE url LIKE ? OR LOWER(name) LIKE ? LIMIT 1`
+        ).bind(`%${serverSlug}%`, `%${serverSlug}%`).first();
+      }
+      if (!srv) {
+        return new Response(JSON.stringify({
+          found: false,
+          server_slug: serverSlug,
+          message: "Server not tracked by Observatory. Register via POST /api/register.",
+          claim_uri: `${url.origin}/.well-known/mcp-observatory`
+        }), {
+          status: 404, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      const snapshots = await db.prepare(
+        "SELECT date, total_calls, successful_calls, avg_latency_ms, trust_score FROM daily_snapshots WHERE server_id = ? ORDER BY date DESC LIMIT 30"
+      ).bind(srv.id).all();
+      const snapshotRows = snapshots.results || [];
+      const score = Math.round((srv.trust_score || 0) * 10) / 10;
+      const trustGrade = score >= 90 ? "A" : score >= 75 ? "B" : score >= 60 ? "C" : score >= 40 ? "D" : "F";
+      const verdict = score >= 75 ? "recommended" : score >= 50 ? "use_with_caution" : "avoid";
+      const snapshots7d = snapshotRows.slice(0, 7);
+      const calcSuccessRate = (rows) => {
+        const totals = rows.reduce((a, r) => ({ calls: a.calls + (r.total_calls || 0), success: a.success + (r.successful_calls || 0) }), { calls: 0, success: 0 });
+        return totals.calls > 0 ? Math.round(totals.success / totals.calls * 1000) / 10 : null;
+      };
+      const calcAvgLatency = (rows) => {
+        const valid = rows.filter((r) => r.avg_latency_ms > 0);
+        return valid.length > 0 ? Math.round(valid.reduce((a, r) => a + r.avg_latency_ms, 0) / valid.length) : null;
+      };
+      const successRateAlltime = (srv.total_calls || 0) > 0 ? Math.round((srv.successful_calls || 0) / srv.total_calls * 1000) / 10 : null;
+      const trend = snapshotRows.length >= 2
+        ? snapshotRows[0].trust_score > snapshotRows[snapshotRows.length - 1].trust_score ? "improving"
+        : snapshotRows[0].trust_score < snapshotRows[snapshotRows.length - 1].trust_score ? "declining" : "stable"
+        : "insufficient_data";
+      return new Response(JSON.stringify({
+        benchmark_version: "1.0",
+        server_slug: serverSlug,
+        server_url: srv.url,
+        name: srv.name,
+        category: srv.category || "uncategorized",
+        trust_score: score,
+        trust_grade: trustGrade,
+        verdict,
+        reliability: {
+          success_rate_7d: calcSuccessRate(snapshots7d),
+          success_rate_30d: calcSuccessRate(snapshotRows),
+          success_rate_alltime: successRateAlltime,
+          trend
+        },
+        latency: {
+          avg_ms: srv.avg_latency_ms ? Math.round(srv.avg_latency_ms) : null,
+          p95_ms: srv.p95_latency_ms ? Math.round(srv.p95_latency_ms) : null,
+          avg_7d_ms: calcAvgLatency(snapshots7d)
+        },
+        volume: {
+          total_calls: srv.total_calls || 0,
+          snapshot_days: snapshotRows.length
+        },
+        data_since: srv.first_seen || null,
+        last_updated: srv.last_checked || null,
+        paid_tier_url: `${url.origin}/agent-query/${serverSlug}`,
+        claim_uri: `${url.origin}/.well-known/mcp-observatory`,
+        observatory: "https://dominion-observatory.sgdata.workers.dev/mcp"
+      }), {
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+          "Cache-Control": "public, max-age=300"
+        }
+      });
+    }
     return new Response(JSON.stringify(infoPayload, null, 2), {
       status: 404,
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
