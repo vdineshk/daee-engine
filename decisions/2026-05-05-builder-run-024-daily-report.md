@@ -218,3 +218,22 @@ Tool names only. No payloads. Singapore PDPA + IMDA agentic-AI governance framew
 — DAEE-BUILDER v4.6, RUN-024, branch claude/confident-brown-WCS4L
   PR: https://github.com/vdineshk/daee-engine/pull/21
   Deploy version: ee02c911-4f70-4cab-847d-28a0564e1b0a
+
+## Notion FAILOVER (Cat 2 timeout on WHAT WORKS write)
+[UNRECONCILED — pending next run]
+
+### WHAT WORKS (failed write — append to Brain on next successful Notion access)
+- (2026-05-05 Builder RUN-024) Dead-reckoning Strategist routes from live endpoint responses works. When local source missing Strategist routes: test live endpoints → capture JSON shape → write equivalent handler. 4 routes written: /.well-known/mcp-observatory, /api/trust-delta, /api/sla-tier, /benchmark/. All verified healthy post-deploy.
+- (2026-05-05 Builder RUN-024) git show origin/{branch}:path extracts Observatory source from any PR branch. Used `git fetch origin {branch} && git show origin/{branch}:dominion-observatory/src/index.js` to pull complete sources from PR #18 and PR #20 for route inventory.
+
+### CONVICTION SCORES (failed write — for Brain update)
+EBTO x402 Payment Rail: 8/10 → LIVE
+AGT HMAC Rail: 7/10 → LIVE
+Benchmark /benchmark/: 9/10 ↑ LIVE
+sla-tier certification: 7/10 ↑ NEW-LIVE (first real deploy)
+Observatory (trust infra): 7/10 ↑ (14 routes, most complete version)
+AGT-β trust-aware router: 7/10 → (next build target; empire-first)
+SDK PyPI/npm: 5/10 → DORMANT
+
+### BUILDER RUN LOG (for Brain)
+2026-05-05 RUN-024 — P0 INFRA-RECOVERY: EBTO+AGT+Benchmark restored (4th wipe). sla-tier first real deploy. GH Actions fixed (removed schedule). 14-route comprehensive source merged. Version ee02c911. PR #21 created. Score 5/8.
