@@ -2989,6 +2989,87 @@ Sitemap: ${url.origin}/sitemap.xml
         headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=300" }
       });
     }
+    if (url.pathname.startsWith("/route/")) {
+      const toolName = decodeURIComponent(url.pathname.replace("/route/", "").replace(/\/$/, ""));
+      if (!toolName) {
+        return new Response(JSON.stringify({ error: "tool name required. Usage: /route/{tool-name}", example: "/route/calculate_cpf_contribution" }), {
+          status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      const externalFilter = `AND i.agent_id NOT IN ('observatory_probe', 'anonymous') AND i.agent_id NOT LIKE '_keeper%'`;
+      let routeResult = await env2.DB.prepare(`
+        SELECT s.url as server_url, s.name as server_name, s.trust_score, s.category,
+          COUNT(i.id) as call_count,
+          AVG(CASE WHEN i.success = 1 THEN 100.0 ELSE 0.0 END) as success_rate,
+          AVG(i.latency_ms) as avg_latency_ms, MAX(i.timestamp) as last_seen
+        FROM interactions i JOIN servers s ON i.server_id = s.id
+        WHERE i.tool_name = ? ${externalFilter}
+        GROUP BY s.id ORDER BY s.trust_score DESC, call_count DESC LIMIT 10
+      `).bind(toolName).all();
+      if (!routeResult.results || routeResult.results.length === 0) {
+        routeResult = await env2.DB.prepare(`
+          SELECT s.url as server_url, s.name as server_name, s.trust_score, s.category,
+            COUNT(i.id) as call_count,
+            AVG(CASE WHEN i.success = 1 THEN 100.0 ELSE 0.0 END) as success_rate,
+            AVG(i.latency_ms) as avg_latency_ms, MAX(i.timestamp) as last_seen
+          FROM interactions i JOIN servers s ON i.server_id = s.id
+          WHERE i.tool_name = ?
+          GROUP BY s.id ORDER BY s.trust_score DESC, call_count DESC LIMIT 10
+        `).bind(toolName).all();
+      }
+      if (!routeResult.results || routeResult.results.length === 0) {
+        return new Response(JSON.stringify({
+          schema: "mcp-trust-router-v1.0",
+          tool: toolName,
+          routes: [],
+          routing_status: "NO_COVERAGE",
+          message: `No behavioral data for tool '${toolName}'. Use POST /api/report with tool_name='${toolName}' after calling any MCP server to build coverage.`,
+          observatory: url.origin,
+          claim_uri: "https://github.com/vdineshk/daee-engine/blob/main/specs/agt-trust-routing-v0.1.md"
+        }), { status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "X-Empire-Primitive": "AGT-BETA-V1" } });
+      }
+      const routes = routeResult.results.map((r, i2) => {
+        const trustScore = Math.round(r.trust_score || 50);
+        let fee_tier, routing_fee_usdc;
+        if (trustScore >= 90) { fee_tier = "T0"; routing_fee_usdc = 5e-4; }
+        else if (trustScore >= 70) { fee_tier = "T1"; routing_fee_usdc = 1e-3; }
+        else if (trustScore >= 40) { fee_tier = "T2"; routing_fee_usdc = 3e-3; }
+        else { fee_tier = "T3"; routing_fee_usdc = 8e-3; }
+        return {
+          rank: i2 + 1, server_url: r.server_url, server_name: r.server_name || r.server_url,
+          trust_score: trustScore, category: r.category || "uncategorized",
+          call_count: r.call_count, success_rate: Math.round(r.success_rate || 50),
+          avg_latency_ms: r.avg_latency_ms ? Math.round(r.avg_latency_ms) : null,
+          last_seen: r.last_seen, fee_tier, routing_fee_usdc,
+          routing_confidence: r.call_count >= 10 ? "HIGH" : r.call_count >= 3 ? "MEDIUM" : "LOW"
+        };
+      });
+      const top = routes[0];
+      return new Response(JSON.stringify({
+        schema: "mcp-trust-router-v1.0",
+        tool: toolName,
+        recommendation: top.server_url,
+        routing_status: "ACTIVE",
+        routes,
+        routing_attestation: {
+          attested_by: "Dominion Observatory",
+          attested_at: new Date().toISOString(),
+          methodology: "behavioral telemetry — ranked by trust_score (success_rate × 0.7 + latency_score × 0.3)",
+          trust_score_range: { min: routes[routes.length - 1].trust_score, max: top.trust_score },
+          data_since: "2026-04-08",
+          fee_note: "routing_fee_usdc inversely correlated to trust_score — higher trust = lower cost"
+        },
+        paid_tier: {
+          upgrade_url: `${url.origin}/agent-query/${encodeURIComponent(top.server_url)}`,
+          benefit: "compliance-grade trust verdict with full audit trail", fee_usdc: top.routing_fee_usdc
+        },
+        observatory: url.origin,
+        claim_uri: "https://github.com/vdineshk/daee-engine/blob/main/specs/agt-trust-routing-v0.1.md"
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "X-Empire-Primitive": "AGT-BETA-V1", "Cache-Control": "public, max-age=60" }
+      });
+    }
     if (url.pathname.startsWith("/agent-query/")) {
       const serverSlug = url.pathname.replace("/agent-query/", "").replace(/\/$/, "");
       if (!serverSlug) {
@@ -3551,6 +3632,7 @@ Contact: observatory@levylens.co`, {
           trust_delta: `${url.origin}/api/trust-delta?window=24h`,
           sla_tier: `${url.origin}/api/sla-tier?server={server_slug}`,
           benchmark: `${url.origin}/benchmark/{server_slug}`,
+          trust_router: `${url.origin}/route/{tool-name}`,
           agent_query: `${url.origin}/agent-query/{server_slug}`,
           leaderboard: `${url.origin}/api/leaderboard`,
           stats: `${url.origin}/api/stats`,
