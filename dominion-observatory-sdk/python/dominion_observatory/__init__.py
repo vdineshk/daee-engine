@@ -18,7 +18,7 @@ import urllib.request
 from dataclasses import dataclass, asdict
 from typing import Any, Awaitable, Callable, Optional, TypeVar
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __all__ = ["report", "check_trust", "instrument", "TrustScore"]
 
 OBSERVATORY_MCP_URL = "https://dominion-observatory.sgdata.workers.dev/mcp"
