@@ -3047,6 +3047,17 @@ Or add the SKILL: see [SKILL.md](https://dominion-observatory.sgdata.workers.dev
         `).bind(toolName).all();
       }
       if (!routeResult.results || routeResult.results.length === 0) {
+        routeResult = await env2.DB.prepare(`
+          SELECT s.url as server_url, s.name as server_name, s.trust_score, s.category,
+            COUNT(i.id) as call_count,
+            AVG(CASE WHEN i.success = 1 THEN 100.0 ELSE 0.0 END) as success_rate,
+            AVG(i.latency_ms) as avg_latency_ms, MAX(i.timestamp) as last_seen
+          FROM interactions i JOIN servers s ON i.server_id = s.id
+          WHERE i.tool_name = '_keeper_tool:' || ?
+          GROUP BY s.id ORDER BY s.trust_score DESC, call_count DESC LIMIT 10
+        `).bind(toolName).all();
+      }
+      if (!routeResult.results || routeResult.results.length === 0) {
         return new Response(JSON.stringify({
           schema: "mcp-trust-router-v1.0",
           tool: toolName,
