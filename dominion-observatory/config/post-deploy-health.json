@@ -1,6 +1,7 @@
 {
-  "version": "1.0",
-  "last_updated": "2026-05-01",
+  "version": "2.0",
+  "last_updated": "2026-05-07",
+  "note": "Updated RUN-027: added CTEF §4.5.6 conformance vectors + H1 B1/B2/B3 artifact endpoints",
   "endpoints": [
     {
       "url": "https://dominion-observatory.sgdata.workers.dev/agent-query/sg-cpf-calculator-mcp",
@@ -11,7 +12,9 @@
         "currency": "USDC",
         "chain": "base"
       },
-      "description": "EBTO x402 payment endpoint — no payment header should return 402 + configured wallet",
+      "description": "EBTO x402 payment endpoint — CTEF §4.5.6 conformance vector. Must return 402 + configured wallet.",
+      "spec_cited": true,
+      "spec_section": "CTEF §4.5.6 + HARD RULE 21",
       "revenue_critical": true
     },
     {
@@ -22,16 +25,134 @@
         "wallet_status": "configured",
         "hmac_required": true
       },
-      "description": "AGT internal HMAC endpoint — should return 402 + HMAC challenge structure",
+      "description": "AGT internal HMAC endpoint — must return 402 + HMAC challenge structure",
+      "spec_cited": true,
+      "spec_section": "HARD RULE 21",
+      "revenue_critical": false
+    },
+    {
+      "url": "https://dominion-observatory.sgdata.workers.dev/benchmark/sg-cpf-calculator-mcp",
+      "expected_status": 200,
+      "expected_json_keys": ["benchmark_version", "trust_grade"],
+      "description": "Benchmark endpoint — CTEF §2.1.1 canonical reference. Must return benchmark_version + trust_grade.",
+      "spec_cited": true,
+      "spec_section": "CTEF §4.5 + §2.1.1 + HARD RULE 21",
+      "revenue_critical": false
+    },
+    {
+      "url": "https://dominion-observatory.sgdata.workers.dev/benchmark/this-server-does-not-exist-ctef-neg-path-test",
+      "expected_status": 404,
+      "expected_json": {
+        "error_code": "SUBJECT_NOT_TRACKED",
+        "found": false
+      },
+      "description": "CTEF §2.1.1 negative-path canonical reference. Non-existent server MUST return 404 + SUBJECT_NOT_TRACKED with no data leakage.",
+      "spec_cited": true,
+      "spec_section": "CTEF §2.1.1 + §4.5.3 negative-path discipline",
+      "revenue_critical": false
+    },
+    {
+      "url": "https://dominion-observatory.sgdata.workers.dev/v1/behavioral-evidence/sg-cpf-calculator-mcp",
+      "expected_status": 200,
+      "expected_json_keys": ["schema", "observer", "found", "trust_score"],
+      "description": "CTEF §4.5.2 canonical evidence_provider. Must return CTEF-conformant shape with schema + observer + found + trust_score.",
+      "spec_cited": true,
+      "spec_section": "CTEF §4.5.2 + §4.5.6 + HARD RULE 21",
+      "revenue_critical": false
+    },
+    {
+      "url": "https://dominion-observatory.sgdata.workers.dev/v1/behavioral-evidence/this-server-does-not-exist-ctef-neg-path-test",
+      "expected_status": 404,
+      "expected_json": {
+        "error_code": "SUBJECT_NOT_TRACKED",
+        "found": false
+      },
+      "description": "CTEF §4.5.3 negative-path discipline. MUST NOT leak tier/confidence/payload/data_sufficiency on error envelopes.",
+      "spec_cited": true,
+      "spec_section": "CTEF §4.5.3 + §2.1.1",
+      "revenue_critical": false
+    },
+    {
+      "url": "https://dominion-observatory.sgdata.workers.dev/api/sla-tier",
+      "expected_status": 200,
+      "expected_json_keys": ["distribution", "schema", "claim_uri"],
+      "description": "SLA tier distribution — CTEF §3.4 litepaper citation source. Must return distribution + schema + claim_uri.",
+      "spec_cited": true,
+      "spec_section": "CTEF §3.4 + §4.5 + HARD RULE 21",
+      "revenue_critical": false
+    },
+    {
+      "url": "https://dominion-observatory.sgdata.workers.dev/api/trust-delta",
+      "expected_status": 200,
+      "expected_json_keys": ["summary", "servers_degraded", "schema"],
+      "description": "Trust delta — CTEF §4.5.6 behavioral_silver_degradation_live conformance vector. Must return summary + servers_degraded + schema.",
+      "spec_cited": true,
+      "spec_section": "CTEF §4.5.6 + HARD RULE 21",
+      "revenue_critical": false
+    },
+    {
+      "url": "https://dominion-observatory.sgdata.workers.dev/.well-known/mcp-observatory",
+      "expected_status": 200,
+      "expected_json_keys": ["name", "mcp_endpoint"],
+      "description": "Observatory substrate discovery — CTEF cited. Must return substrate description.",
+      "spec_cited": true,
+      "spec_section": "CTEF + HARD RULE 21",
       "revenue_critical": false
     },
     {
       "url": "https://dominion-observatory.sgdata.workers.dev/api/stats",
       "expected_status": 200,
-      "expected_json": {
-        "observatory": "Dominion Observatory"
-      },
+      "expected_json_keys": ["observatory"],
       "description": "Observatory stats endpoint — core health check",
+      "spec_cited": false,
+      "revenue_critical": false
+    },
+    {
+      "url": "https://dominion-observatory.sgdata.workers.dev/.cursorrules",
+      "expected_status": 200,
+      "expected_body_contains": "Dominion Observatory - MCP Trust Verification Rule",
+      "expected_content_type_prefix": "text/plain",
+      "description": "H1 B1: Canonical Cursor rule artifact. Must return exact rule text as text/plain.",
+      "spec_cited": false,
+      "h1_artifact": true,
+      "revenue_critical": false
+    },
+    {
+      "url": "https://dominion-observatory.sgdata.workers.dev/docs/cursor-rule.md",
+      "expected_status": 200,
+      "expected_body_contains": "Dominion Observatory - MCP Trust Verification Rule",
+      "expected_content_type_prefix": "text/markdown",
+      "description": "H1 B1: Cursor rule as Markdown. Must return exact rule text as text/markdown.",
+      "spec_cited": false,
+      "h1_artifact": true,
+      "revenue_critical": false
+    },
+    {
+      "url": "https://dominion-observatory.sgdata.workers.dev/agent-onboarding/SKILL.md",
+      "expected_status": 200,
+      "expected_body_contains": "name: dominion-observatory",
+      "expected_content_type_prefix": "text/markdown",
+      "description": "H1 B2: SKILL.md agent onboarding artifact. Must contain frontmatter with name: dominion-observatory.",
+      "spec_cited": false,
+      "h1_artifact": true,
+      "revenue_critical": false
+    },
+    {
+      "url": "https://dominion-observatory.sgdata.workers.dev/.well-known/agent-card.json",
+      "expected_status": 200,
+      "expected_json_keys": ["name", "capabilities", "mcp_endpoint", "cursor_rule"],
+      "description": "H1 B3: A2A agent card per RFC 8615. Must contain name + capabilities + mcp_endpoint + cursor_rule.",
+      "spec_cited": false,
+      "h1_artifact": true,
+      "revenue_critical": false
+    },
+    {
+      "url": "https://dominion-observatory.sgdata.workers.dev/.well-known/mcp/server-card.json",
+      "expected_status": 200,
+      "expected_json_keys": ["name", "mcp_endpoint", "cursor_rule", "skill_md"],
+      "description": "H1 B3: MCP server card (Cloudflare-style). Must contain name + mcp_endpoint + cursor_rule + skill_md.",
+      "spec_cited": false,
+      "h1_artifact": true,
       "revenue_critical": false
     }
   ]
