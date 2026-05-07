@@ -3782,6 +3782,94 @@ Contact: observatory@levylens.co`, {
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
       });
     }
+    if (url.pathname === "/api/alert/subscribe" && request.method === "POST") {
+      let body;
+      try { body = await request.json(); } catch { body = {}; }
+      const { agent_id, webhook_url, server_urls, drift_threshold = 5 } = body;
+      if (!agent_id || !webhook_url || !Array.isArray(server_urls) || server_urls.length === 0) {
+        return new Response(JSON.stringify({ error: "agent_id, webhook_url, and server_urls[] required" }), {
+          status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      await db.exec(`CREATE TABLE IF NOT EXISTS alert_subscriptions (id TEXT PRIMARY KEY, agent_id TEXT NOT NULL, webhook_url TEXT NOT NULL, server_urls TEXT NOT NULL, drift_threshold INTEGER DEFAULT 5, created_at TEXT DEFAULT (datetime('now')))`);
+      const id = `sub-${Date.now()}-${Math.random().toString(36).substr(2, 8)}`;
+      await db.prepare(`INSERT OR REPLACE INTO alert_subscriptions (id, agent_id, webhook_url, server_urls, drift_threshold, created_at) VALUES (?, ?, ?, ?, ?, datetime('now'))`)
+        .bind(id, agent_id, webhook_url, JSON.stringify(server_urls), drift_threshold).run();
+      return new Response(JSON.stringify({
+        status: "subscribed",
+        subscription_id: id,
+        agent_id,
+        servers_watched: server_urls.length,
+        drift_threshold,
+        schema: "mcp-behavioral-alert-v1.0",
+        claim_uri: `${url.origin}/.well-known/mcp-observatory`
+      }), {
+        status: 201, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+      });
+    }
+    if (url.pathname === "/api/alert/subscriptions" && request.method === "GET") {
+      let rows = { results: [] };
+      try {
+        await db.exec(`CREATE TABLE IF NOT EXISTS alert_subscriptions (id TEXT PRIMARY KEY, agent_id TEXT NOT NULL, webhook_url TEXT NOT NULL, server_urls TEXT NOT NULL, drift_threshold INTEGER DEFAULT 5, created_at TEXT DEFAULT (datetime('now')))`);
+        rows = await db.prepare("SELECT agent_id, server_urls, drift_threshold, created_at FROM alert_subscriptions ORDER BY created_at DESC LIMIT 100").all();
+      } catch (_e) { rows = { results: [] }; }
+      const subs = (rows.results || []).map((r) => ({
+        agent_id: r.agent_id,
+        servers_watched: (() => { try { return JSON.parse(r.server_urls).length; } catch { return 0; } })(),
+        drift_threshold: r.drift_threshold,
+        subscribed_at: r.created_at
+      }));
+      return new Response(JSON.stringify({
+        endpoint: "/api/alert/subscriptions",
+        description: "Active behavioral drift alert subscriptions. Agents receive a webhook push when watched MCP server trust scores shift by drift_threshold points.",
+        total_active_subscriptions: subs.length,
+        subscriptions: subs,
+        subscribe_at: "POST /api/alert/subscribe",
+        schema: "mcp-behavioral-alert-v1.0"
+      }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Cache-Control": "no-cache" }
+      });
+    }
+    if (url.pathname === "/api/fleet-monitor" && request.method === "GET") {
+      const urlsParam = url.searchParams.get("urls") || url.searchParams.get("url") || "";
+      const serverUrls = urlsParam.split(",").map((u) => u.trim()).filter(Boolean);
+      if (serverUrls.length === 0) {
+        return new Response(JSON.stringify({
+          error: "urls parameter required",
+          usage: "/api/fleet-monitor?urls=https://server1.mcp/mcp,https://server2.mcp/mcp",
+          max_batch: 20,
+          schema: "mcp-fleet-monitor-v1.0"
+        }), {
+          status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      const batch = serverUrls.slice(0, 20);
+      const results = await Promise.all(batch.map(async (su) => {
+        const srv = await db.prepare("SELECT url, name, trust_score, total_calls, last_checked FROM servers WHERE url = ? OR url LIKE ? LIMIT 1").bind(su, `%${su}%`).first();
+        if (!srv) return { url: su, found: false, trust_score: null, status: "untracked" };
+        const score = srv.trust_score || 0;
+        return {
+          url: srv.url,
+          name: srv.name,
+          found: true,
+          trust_score: Math.round(score * 10) / 10,
+          grade: score >= 90 ? "A" : score >= 75 ? "B" : score >= 60 ? "C" : score >= 40 ? "D" : "F",
+          verdict: score >= 75 ? "recommended" : score >= 50 ? "use_with_caution" : "avoid",
+          last_checked: srv.last_checked,
+          attestation_url: `${url.origin}/v1/behavioral-evidence?url=${encodeURIComponent(srv.url)}`
+        };
+      }));
+      return new Response(JSON.stringify({
+        schema: "mcp-fleet-monitor-v1.0",
+        generated_at: new Date().toISOString(),
+        queried: batch.length,
+        results,
+        observatory: url.origin,
+        claim_uri: `${url.origin}/.well-known/mcp-observatory`
+      }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=60" }
+      });
+    }
     return new Response(JSON.stringify(infoPayload, null, 2), {
       status: 404,
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
