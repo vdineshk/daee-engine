@@ -2017,6 +2017,76 @@ const CTEF_ERROR_CODES = {
   OBSERVATORY_TRANSIENT: "OBSERVATORY_TRANSIENT",
   SUBJECT_NOT_ELIGIBLE: "SUBJECT_NOT_ELIGIBLE"
 };
+async function handleCTEFValidate(db, params) {
+  const { server_id, server_url, ctef_version = "0.3.2" } = params;
+  const identifier = server_id || server_url;
+  let server = null;
+  if (identifier.startsWith("http")) {
+    server = await db.prepare(
+      "SELECT id, url, name, trust_score, total_calls FROM servers WHERE url = ? LIMIT 1"
+    ).bind(identifier).first();
+  }
+  if (!server) {
+    server = await db.prepare(
+      "SELECT id, url, name, trust_score, total_calls FROM servers WHERE url LIKE ? OR LOWER(name) LIKE ? LIMIT 1"
+    ).bind(`%${identifier}%`, `%${identifier.toLowerCase()}%`).first();
+  }
+  if (!server) {
+    return {
+      server_id: identifier,
+      ctef_version,
+      section: "4.5",
+      compliant: false,
+      trust_score: null,
+      behavioral_drift_flag: null,
+      behavioral_drift_magnitude: null,
+      evidence_uri: null,
+      assessment: "INSUFFICIENT_DATA",
+      criteria: {
+        trust_score_gte_50: null,
+        no_active_drift: null,
+        behavioral_evidence_available: false
+      },
+      checked_at: new Date().toISOString(),
+      message: "Server not tracked by Observatory. Register via POST /api/register to begin trust data collection."
+    };
+  }
+  const snapshot = await db.prepare(
+    "SELECT trust_score FROM daily_snapshots WHERE server_id = ? ORDER BY date DESC LIMIT 1"
+  ).bind(server.id).first();
+  let behavioral_drift_flag = false;
+  let behavioral_drift_magnitude = null;
+  if (snapshot && snapshot.trust_score != null && server.trust_score != null) {
+    const drop = (snapshot.trust_score || 0) - (server.trust_score || 0);
+    if (drop > 5) {
+      behavioral_drift_flag = true;
+      behavioral_drift_magnitude = Math.round(drop * 10) / 10;
+    }
+  }
+  const trustScore = Math.round((server.trust_score || 0) * 10) / 10;
+  const interactionCount = server.total_calls || 0;
+  const criteria = {
+    trust_score_gte_50: trustScore >= 50,
+    no_active_drift: !behavioral_drift_flag,
+    behavioral_evidence_available: interactionCount >= 10
+  };
+  const compliant = criteria.trust_score_gte_50 && criteria.no_active_drift && criteria.behavioral_evidence_available;
+  const assessment = compliant ? "COMPLIANT" : (interactionCount < 10 && !behavioral_drift_flag && trustScore >= 50 ? "INSUFFICIENT_DATA" : "NON_COMPLIANT");
+  return {
+    server_id: server.url,
+    ctef_version,
+    section: "4.5",
+    compliant,
+    trust_score: trustScore,
+    behavioral_drift_flag,
+    behavioral_drift_magnitude: behavioral_drift_flag ? behavioral_drift_magnitude : null,
+    evidence_uri: null,
+    assessment,
+    criteria,
+    checked_at: new Date().toISOString()
+  };
+}
+__name(handleCTEFValidate, "handleCTEFValidate");
 var index_default = {
   // Cloudflare cron entry point. Configured in wrangler.jsonc.
   // Runs every 15 minutes; probes ~25 callable MCP endpoints per run.
@@ -2893,6 +2963,39 @@ Sitemap: ${url.origin}/sitemap.xml
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
       });
     }
+    if (url.pathname === "/api/ctef/validate" && (request.method === "GET" || request.method === "POST")) {
+      let params = {};
+      if (request.method === "POST") {
+        try {
+          params = await request.json();
+        } catch (e) {
+          return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+            status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+          });
+        }
+      } else {
+        params = {
+          server_id: url.searchParams.get("server_id"),
+          server_url: url.searchParams.get("server_url"),
+          ctef_version: url.searchParams.get("ctef_version") || "0.3.2"
+        };
+      }
+      if (!params.server_id && !params.server_url) {
+        return new Response(JSON.stringify({
+          error: "server_id or server_url required",
+          example_post: { server_id: "sg-cpf-calculator-mcp", ctef_version: "0.3.2" },
+          example_get: "/api/ctef/validate?server_id=sg-cpf-calculator-mcp"
+        }), { status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+      }
+      const result = await handleCTEFValidate(db, params);
+      const serverId = result.server_id || params.server_id || params.server_url || "";
+      const slug = serverId.replace(/^https?:\/\//, "").split(".")[0];
+      result.evidence_uri = `${url.origin}/v1/behavioral-evidence/${encodeURIComponent(slug)}`;
+      result.claim_uri = `${url.origin}/.well-known/mcp-observatory`;
+      return new Response(JSON.stringify(result), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+      });
+    }
     if (url.pathname === "/api/servers" && request.method === "GET") {
       const category = url.searchParams.get("category");
       const limit = Math.min(parseInt(url.searchParams.get("limit") || "50"), 200);
@@ -2933,6 +3036,7 @@ Sitemap: ${url.origin}/sitemap.xml
         register_server: "POST /api/register {server_url, name, description?, category?, github_url?}",
         compliance_export: "/api/compliance?server_url=<url>&agent_id=<id>&start_date=<YYYY-MM-DD>&end_date=<YYYY-MM-DD>",
         servers_list: "/api/servers?category=<category>&limit=<n>",
+        ctef_validate: "/api/ctef/validate",
         info: "/api/info",
         landing: "/"
       },
@@ -3081,6 +3185,7 @@ Tracking 4,500+ MCP servers across 16 categories.
 POST /mcp                             — MCP tools interface (tools/list, tools/call)
 /api/badge?url={server_url}           — SVG trust score badge for READMEs
 /api/agent-readiness?url={url}        — agent-readiness scanner (llms.txt, openapi, well-known, MCP)
+/api/ctef/validate?server_id={id}    — CTEF v0.3.2 §4.5 compliance validator (GET or POST {server_id, ctef_version})
 
 ## Payment-gated endpoints
 /agent-query/{server_slug}            — x402 USDC-gated trust verdict (0.001 USDC on Base mainnet)
@@ -3551,6 +3656,7 @@ Contact: observatory@levylens.co`, {
           trust_delta: `${url.origin}/api/trust-delta?window=24h`,
           sla_tier: `${url.origin}/api/sla-tier?server={server_slug}`,
           benchmark: `${url.origin}/benchmark/{server_slug}`,
+          ctef_validate: `${url.origin}/api/ctef/validate`,
           agent_query: `${url.origin}/agent-query/{server_slug}`,
           leaderboard: `${url.origin}/api/leaderboard`,
           stats: `${url.origin}/api/stats`,
