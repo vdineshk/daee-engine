@@ -3079,12 +3079,24 @@ Tracking 4,500+ MCP servers across 16 categories.
 /api/stats                            — observatory stats (servers, interactions, external demand)
 /api/leaderboard                      — top-performing servers by trust score
 /api/compliance                       — IMDA/EU AI Act compliant governance export
-/v1/behavioral-evidence?url={server_url} — A2A evidence_ref v1 format
+/v1/behavioral-evidence?url={server_url} — CTEF v0.3.2 §4.5 behavioral evidence format
 /v1/erc8004-attestation?url={server_url} — ERC-8004 endpoint health attestation
 /.well-known/mcp-observatory          — machine-readable discovery metadata
 POST /mcp                             — MCP tools interface (tools/list, tools/call)
 /api/badge?url={server_url}           — SVG trust score badge for READMEs
 /api/agent-readiness?url={url}        — agent-readiness scanner (llms.txt, openapi, well-known, MCP)
+
+## CTEF v0.3.2 §4.5 endpoints
+/api/ctef/validate?server_id={id}    — CTEF §4.5 compliance check (compliant/non-compliant + drift)
+/api/ctef/attest?server_id={id}      — Generate /.well-known/ctef-conformance document for your server
+/.well-known/ctef-conformance         — Observatory's own CTEF conformance self-attestation
+
+## Agent discovery surfaces
+/agent-onboarding/SKILL.md            — agent skill card (CTEF conformant, for framework onboarding)
+/.well-known/agent-card.json          — A2A agent card (skills, payment, capabilities)
+/.well-known/mcp/server-card.json     — MCP server card
+/.cursorrules                          — Cursor rule for MCP trust gate enforcement
+/install                               — installation and onboarding guide
 
 ## Payment-gated endpoints
 /agent-query/{server_slug}            — x402 USDC-gated trust verdict (0.001 USDC on Base mainnet)
@@ -3095,6 +3107,7 @@ pip install dominion-observatory
 npm install dominion-observatory-sdk
 
 ## Standards compatibility
+CTEF v0.3.2: https://dominion-observatory.sgdata.workers.dev/.well-known/ctef-conformance
 SEP-2668: https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2668
 A2A: mcp-behavioral-evidence-v1.0 evidence_ref compatible
 ERC-8004: endpoint health attestation v1.0
@@ -4173,6 +4186,88 @@ Agents: check trust scores at https://dominion-observatory.sgdata.workers.dev/mc
         claim_uri: `${url.origin}/.well-known/mcp-observatory`
       }), {
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+      });
+    }
+    // /api/ctef/attest — CTEF v0.3.2 §4.5 conformance document generator for any tracked server
+    if (url.pathname === "/api/ctef/attest" && (request.method === "GET" || request.method === "POST")) {
+      let serverId = url.searchParams.get("server_id") || url.searchParams.get("server_url");
+      if (request.method === "POST") {
+        try {
+          const body = await request.json();
+          serverId = serverId || body.server_id || body.server_url;
+        } catch (e) {}
+      }
+      if (!serverId) {
+        return new Response(JSON.stringify({
+          error: "server_id or server_url required",
+          example_get: "/api/ctef/attest?server_id=your-mcp-server",
+          example_post: { server_id: "your-mcp-server-slug" },
+          usage: "Returns a ready-to-deploy /.well-known/ctef-conformance document for your MCP server",
+          attester: url.origin,
+          docs: `${url.origin}/agent-onboarding/SKILL.md`
+        }), {
+          status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      const serverUrl3 = serverId.startsWith("http") ? serverId : `https://${serverId}.sgdata.workers.dev/mcp`;
+      const slug3 = serverId.replace(/^https?:\/\//, "").replace(/\.sgdata\.workers\.dev.*$/, "").replace(/\//g, "").replace(/[^a-z0-9-]/g, "");
+      const srv3 = await db.prepare(
+        "SELECT id, url, name, trust_score, total_calls FROM servers WHERE url = ? OR url LIKE ? OR LOWER(name) LIKE ? LIMIT 1"
+      ).bind(serverUrl3, `%${serverId}%`, `%${slug3}%`).first();
+      const snaps3 = srv3 ? await db.prepare(
+        "SELECT date, trust_score FROM daily_snapshots WHERE server_id = ? ORDER BY date DESC LIMIT 7"
+      ).bind(srv3.id).all() : { results: [] };
+      const snapRows3 = snaps3.results || [];
+      let driftFlag3 = false;
+      if (snapRows3.length >= 2) {
+        const oldest3 = snapRows3[snapRows3.length - 1].trust_score;
+        const latest3 = snapRows3[0].trust_score;
+        driftFlag3 = (oldest3 - latest3) > 5;
+      }
+      const score3 = srv3 ? (srv3.trust_score || 0) : null;
+      const hasData3 = srv3 && (srv3.total_calls || 0) >= 10;
+      const compliant3 = hasData3 && score3 >= 50 && !driftFlag3;
+      const conformanceDoc = {
+        ctef_version: "0.3.2",
+        conformance_level: hasData3 ? (compliant3 ? "assessed-compliant" : "assessed-non-compliant") : "pending-assessment",
+        for_server: srv3 ? srv3.url : serverUrl3,
+        server_id: slug3 || serverId,
+        attester: "dominion-observatory",
+        attester_url: url.origin,
+        generated_at: new Date().toISOString(),
+        spec_sections: ["§4.5"],
+        compliance: hasData3 ? {
+          compliant: compliant3,
+          trust_score: Math.round((score3 || 0) * 10) / 10,
+          behavioral_drift_flag: driftFlag3,
+          assessment: compliant3 ? "COMPLIANT" : "NON_COMPLIANT",
+          evidence_uri: `${url.origin}/v1/behavioral-evidence/${slug3}`
+        } : {
+          compliant: null,
+          assessment: "INSUFFICIENT_DATA",
+          register_at: `${url.origin}/api/register`,
+          note: "Server not yet tracked. Register to begin CTEF conformance assessment."
+        },
+        endpoints: {
+          behavioral_evidence: `${url.origin}/v1/behavioral-evidence/${slug3 || "{server_id}"}`,
+          ctef_validate: `${url.origin}/api/ctef/validate?server_id=${slug3 || "{server_id}"}`
+        },
+        source: "dominion-observatory",
+        verification_url: `${url.origin}/api/ctef/validate?server_id=${slug3 || serverId}`,
+        deploy_instructions: {
+          file_path: ".well-known/ctef-conformance",
+          serve_as: "application/json",
+          note: "Copy the content of this response to .well-known/ctef-conformance on your MCP server"
+        }
+      };
+      return new Response(JSON.stringify(conformanceDoc, null, 2), {
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "public, max-age=300",
+          "Access-Control-Allow-Origin": "*",
+          "X-CTEF-Attester": url.origin,
+          "X-CTEF-Version": "0.3.2"
+        }
       });
     }
     return new Response(JSON.stringify(infoPayload, null, 2), {
