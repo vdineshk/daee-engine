@@ -33,6 +33,15 @@
       },
       "description": "Observatory stats endpoint — core health check",
       "revenue_critical": false
+    },
+    {
+      "url": "https://dominion-observatory.sgdata.workers.dev/api/trust-badge/sg-cpf-calculator-mcp",
+      "expected_status": 200,
+      "expected_content_type": "image/svg+xml",
+      "expected_body_contains": "MCP trust",
+      "description": "Trust badge SVG endpoint — shields.io-style grade+score badge for MCP server READMEs",
+      "revenue_critical": false,
+      "novelty_claim": "first-mcp-trust-grade-badge-path-param-url"
     }
   ]
 }
