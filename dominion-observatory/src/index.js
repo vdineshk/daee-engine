@@ -3091,6 +3091,7 @@ POST /mcp                             — MCP tools interface (tools/list, tools
 /api/ctef/validate?server_id={id}    — CTEF §4.5 compliance check (compliant/non-compliant + drift)
 /api/ctef/attest?server_id={id}      — Generate /.well-known/ctef-conformance document for your server
 /api/ctef/readiness/{server_id}      — CTEF v0.3.2 multi-criteria readiness checker (6-point, path-param)
+/api/ctef/ecosystem                  — Ecosystem-level CTEF readiness report: grade distribution, criterion coverage across 4,500+ servers (schema: ctef-ecosystem/v1)
 /.well-known/ctef-conformance         — Observatory's own CTEF conformance self-attestation
 
 ## Agent discovery surfaces
@@ -3193,19 +3194,32 @@ Contact: observatory@levylens.co`, {
     }
     if (url.pathname === "/openapi.json") {
       const spec = {
-        openapi: "3.0.3",
-        info: { title: "Dominion Observatory API", version: "1.2.0", description: "Behavioral trust layer for MCP servers — runtime telemetry tracking 4,500+ servers", contact: { email: "observatory@levylens.co" } },
+        openapi: "3.1.0",
+        info: { title: "Dominion Observatory API", version: "1.4.0", description: "Behavioral trust layer for MCP servers — runtime telemetry tracking 4,500+ servers. CTEF v0.3.2 compliant evidence provider (§4.5 canonical evidence_provider primitive).", contact: { email: "observatory@levylens.co" } },
         servers: [{ url: url.origin }],
         paths: {
-          "/api/trust": { get: { summary: "Get trust score for a server", parameters: [{ name: "url", in: "query", required: true, schema: { type: "string", format: "uri" } }], responses: { "200": { description: "Trust score and behavioral summary" } } } },
-          "/api/stats": { get: { summary: "Observatory statistics", responses: { "200": { description: "Stats including total servers, external demand, categories" } } } },
-          "/api/leaderboard": { get: { summary: "Top-performing servers", parameters: [{ name: "limit", in: "query", schema: { type: "integer", default: 20 } }], responses: { "200": { description: "Ranked server list" } } } },
-          "/api/compliance": { get: { summary: "IMDA + EU AI Act compliant export", responses: { "200": { description: "Governance-compliant interaction report" } } } },
-          "/v1/behavioral-evidence": { get: { summary: "A2A evidence_ref v1 attestation", parameters: [{ name: "url", in: "query", required: true, schema: { type: "string", format: "uri" } }], responses: { "200": { description: "mcp-behavioral-evidence-v1.0 schema" } } } },
-          "/v1/erc8004-attestation": { get: { summary: "ERC-8004 endpoint health attestation", parameters: [{ name: "url", in: "query", required: true, schema: { type: "string", format: "uri" } }], responses: { "200": { description: "erc8004-attestation-v1.0 schema" } } } },
-          "/api/badge": { get: { summary: "SVG trust score badge", parameters: [{ name: "url", in: "query", required: true, schema: { type: "string", format: "uri" } }], responses: { "200": { description: "SVG image", content: { "image/svg+xml": {} } } } } },
-          "/api/agent-readiness": { get: { summary: "Agent-readiness scanner", parameters: [{ name: "url", in: "query", required: true, schema: { type: "string", format: "uri" } }], responses: { "200": { description: "Agent-readiness scores and detected surfaces" } } } },
-          "/api/payment-info": { get: { summary: "Payment configuration", responses: { "200": { description: "x402 payment details" } } } }
+          "/api/trust": { get: { operationId: "getTrustScore", summary: "Get trust score for a server", description: "Returns behavioral trust score (0-100), latency stats, uptime, and success rate. Use BEFORE calling an unknown MCP server. Scores ≥70 = reliable; <30 = risky.", parameters: [{ name: "url", in: "query", required: true, schema: { type: "string", format: "uri" }, description: "MCP server URL to look up" }], responses: { "200": { description: "Trust score and behavioral summary" } } } },
+          "/api/stats": { get: { operationId: "getObservatoryStats", summary: "Observatory statistics — total servers, external demand, category breakdown", responses: { "200": { description: "Stats including total servers, external demand, categories" } } } },
+          "/api/leaderboard": { get: { operationId: "getLeaderboard", summary: "Top-performing MCP servers by trust grade", parameters: [{ name: "limit", in: "query", schema: { type: "integer", default: 20 } }, { name: "category", in: "query", schema: { type: "string" }, description: "Filter by category: finance, code, search, compliance, etc." }], responses: { "200": { description: "Ranked server list" } } } },
+          "/api/compliance": { get: { operationId: "getComplianceReport", summary: "IMDA + EU AI Act compliant interaction export", responses: { "200": { description: "Governance-compliant interaction report" } } } },
+          "/v1/behavioral-evidence": { get: { operationId: "getBehavioralEvidence", summary: "A2A evidence_ref v1 — CTEF §4.5 behavioral evidence attestation", parameters: [{ name: "url", in: "query", required: true, schema: { type: "string", format: "uri" } }], responses: { "200": { description: "mcp-behavioral-evidence-v1.0 schema conformant response" } } } },
+          "/v1/behavioral-evidence/{server_id}": { get: { operationId: "getBehavioralEvidenceById", summary: "CTEF §4.5 behavioral evidence by server slug", parameters: [{ name: "server_id", in: "path", required: true, schema: { type: "string" }, example: "sg-cpf-calculator-mcp" }], responses: { "200": { description: "CTEF §4.5 behavioral evidence response" } } } },
+          "/v1/erc8004-attestation": { get: { operationId: "getErc8004Attestation", summary: "ERC-8004 endpoint health attestation", parameters: [{ name: "url", in: "query", required: true, schema: { type: "string", format: "uri" } }], responses: { "200": { description: "erc8004-attestation-v1.0 schema" } } } },
+          "/api/trust-delta": { get: { operationId: "getTrustDelta", summary: "CTEF §4.5 behavioral drift detection — score change over time", parameters: [{ name: "url", in: "query", required: true, schema: { type: "string", format: "uri" } }, { name: "window", in: "query", schema: { type: "string", default: "24h" }, description: "Time window: 24h, 7d, 30d" }], responses: { "200": { description: "Behavioral delta with drift flag and magnitude" } } } },
+          "/api/sla-tier": { get: { operationId: "getSLATier", summary: "CTEF §3.4 SLA tier classification — Platinum/Gold/Silver/Bronze", parameters: [{ name: "server", in: "query", schema: { type: "string" }, description: "Filter by server slug (optional)" }], responses: { "200": { description: "SLA tier distribution across ecosystem" } } } },
+          "/benchmark/{server_id}": { get: { operationId: "getBenchmark", summary: "Behavioral benchmark report for a specific MCP server", parameters: [{ name: "server_id", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Benchmark report with trust grade and metrics" } } } },
+          "/api/ctef/validate": { get: { operationId: "validateCtefCompliance", summary: "CTEF v0.3.2 §4.5 compliance validator", parameters: [{ name: "server_id", in: "query", schema: { type: "string" }, description: "Server slug or URL" }], responses: { "200": { description: "CTEF compliance assessment with trust score and drift flag" } } }, post: { operationId: "validateCtefCompliancePost", summary: "CTEF v0.3.2 compliance validator (POST)", requestBody: { content: { "application/json": { schema: { type: "object", properties: { server_id: { type: "string" } }, required: ["server_id"] } } } }, responses: { "200": { description: "CTEF compliance assessment" } } } },
+          "/api/ctef/attest": { get: { operationId: "generateCttefConformanceDoc", summary: "Generate CTEF §4.5 conformance document for deployment to /.well-known/ctef-conformance", parameters: [{ name: "server_id", in: "query", required: true, schema: { type: "string" } }], responses: { "200": { description: "CTEF conformance JSON document ready for deployment" } } } },
+          "/api/ctef/readiness/{server_id}": { get: { operationId: "getCtefReadiness", summary: "6-criterion CTEF v0.3.2 readiness checker with step-by-step fix guidance", parameters: [{ name: "server_id", in: "path", required: true, schema: { type: "string" }, example: "sg-cpf-calculator-mcp" }], responses: { "200": { description: "CTEF readiness score (0-6), grade, and per-criterion pass/fail with fix instructions" } } } },
+          "/api/ctef/ecosystem": { get: { operationId: "getCtefEcosystemReport", summary: "Ecosystem-level CTEF v0.3.2 readiness report across all 4,500+ tracked MCP servers", description: "Returns aggregate statistics: % of servers meeting CTEF minimum bar, trust grade distribution, criterion coverage. Updated every 15 minutes. Use this to understand MCP ecosystem compliance state before CTEF v0.3.2 publication.", responses: { "200": { description: "ctef-ecosystem/v1 schema with trust grade distribution and criterion coverage stats" } } } },
+          "/api/trust-badge/{server_id}": { get: { operationId: "getTrustBadge", summary: "SVG trust grade badge for embedding in README files", parameters: [{ name: "server_id", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "SVG badge image", content: { "image/svg+xml": {} } } } } },
+          "/api/badge": { get: { operationId: "getTrustBadgeByUrl", summary: "SVG trust score badge (URL-based)", parameters: [{ name: "url", in: "query", required: true, schema: { type: "string", format: "uri" } }], responses: { "200": { description: "SVG image", content: { "image/svg+xml": {} } } } } },
+          "/api/agent-readiness": { get: { operationId: "getAgentReadiness", summary: "Agent-readiness scanner — checks llms.txt, openapi.json, well-known URIs, MCP conformance", parameters: [{ name: "url", in: "query", required: true, schema: { type: "string", format: "uri" } }], responses: { "200": { description: "Agent-readiness scores and detected surfaces" } } } },
+          "/api/payment-info": { get: { operationId: "getPaymentInfo", summary: "x402 payment configuration for agent-payable endpoints", responses: { "200": { description: "x402 payment details including wallet address and price" } } } },
+          "/.well-known/ctef-conformance": { get: { operationId: "getCttefConformance", summary: "Observatory CTEF v0.3.2 self-attestation conformance document", responses: { "200": { description: "CTEF conformance JSON with claimed primitives and evidence URIs" } } } },
+          "/.well-known/agent-card.json": { get: { operationId: "getAgentCard", summary: "Agent card — machine-readable Observatory capabilities for agent discovery", responses: { "200": { description: "Agent card JSON per agent-card.json spec" } } } },
+          "/agent-onboarding/SKILL.md": { get: { operationId: "getSkillMd", summary: "SKILL.md — agent onboarding instructions for Observatory tool use", responses: { "200": { description: "Markdown skill definition" } } } },
+          "/.cursorrules": { get: { operationId: "getCursorRules", summary: "Cursor rules — instructs Cursor AI to use Observatory trust checks before calling MCP servers", responses: { "200": { description: "Plain text cursor rules" } } } }
         }
       };
       return new Response(JSON.stringify(spec, null, 2), {
@@ -4457,6 +4471,106 @@ Agents: check trust scores at https://dominion-observatory.sgdata.workers.dev/mc
           "Access-Control-Allow-Origin": "*",
           "X-Trust-Score": score !== null ? String(score) : "unrated",
           "X-Trust-Grade": grade,
+          "X-Observatory": url.origin
+        }
+      });
+    }
+    // /api/ctef/ecosystem — aggregate ecosystem-level CTEF v0.3.2 readiness report [RUN-037]
+    if (url.pathname === "/api/ctef/ecosystem" || url.pathname === "/api/ctef/ecosystem-report") {
+      const [totalRow, withEvidenceRow, gradeARow, gradeBRow, gradeCRow, gradeDRow, gradeFRow, avgTrustRow, withDriftRow] = await Promise.all([
+        db.prepare("SELECT COUNT(*) as n FROM servers").first(),
+        db.prepare("SELECT COUNT(*) as n FROM servers WHERE total_calls >= 10").first(),
+        db.prepare("SELECT COUNT(*) as n FROM servers WHERE trust_score >= 90 AND total_calls >= 10").first(),
+        db.prepare("SELECT COUNT(*) as n FROM servers WHERE trust_score >= 75 AND trust_score < 90 AND total_calls >= 10").first(),
+        db.prepare("SELECT COUNT(*) as n FROM servers WHERE trust_score >= 60 AND trust_score < 75 AND total_calls >= 10").first(),
+        db.prepare("SELECT COUNT(*) as n FROM servers WHERE trust_score >= 40 AND trust_score < 60 AND total_calls >= 10").first(),
+        db.prepare("SELECT COUNT(*) as n FROM servers WHERE trust_score < 40 AND total_calls >= 10").first(),
+        db.prepare("SELECT ROUND(AVG(trust_score),1) as avg FROM servers WHERE total_calls >= 10").first(),
+        db.prepare("SELECT COUNT(DISTINCT server_id) as n FROM daily_snapshots").first()
+      ]);
+      const total = totalRow?.n || 0;
+      const withEvidence = withEvidenceRow?.n || 0;
+      const pctEvidence = total > 0 ? Math.round(withEvidence / total * 1000) / 10 : 0;
+      const withDriftCount = withDriftRow?.n || 0;
+      const pctDrift = total > 0 ? Math.round(withDriftCount / total * 1000) / 10 : 0;
+      const today = new Date();
+      const ctefPub = new Date("2026-05-19T00:00:00Z");
+      const daysToPub = Math.max(0, Math.ceil((ctefPub - today) / 86400000));
+      const ecoDoc = {
+        schema: "ctef-ecosystem/v1",
+        ctef_version: "0.3.2",
+        ctef_publication_date: "2026-05-19",
+        days_to_publication: daysToPub,
+        generated_at: today.toISOString(),
+        observatory: "dominion-observatory",
+        observatory_url: url.origin,
+        ecosystem_servers_tracked: total,
+        note: "Only servers with ≥10 recorded interactions receive full CTEF evaluation. §2.1.1 negative-path criterion is always satisfied by Observatory for any query.",
+        ctef_readiness_summary: {
+          ecosystem_readiness_pct: pctEvidence,
+          description: `${pctEvidence}% of tracked servers meet CTEF §4.5 minimum behavioral evidence threshold (≥10 interactions)`,
+          servers_with_behavioral_evidence: withEvidence,
+          servers_without_evidence: total - withEvidence,
+          average_trust_score_graded: avgTrustRow?.avg || null
+        },
+        criterion_coverage: {
+          "§4.5_behavioral_evidence": {
+            criterion: "Server has ≥10 recorded interactions enabling §4.5 behavioral_evidence",
+            passing_servers: withEvidence,
+            total_servers: total,
+            pct: pctEvidence,
+            endpoint: `${url.origin}/v1/behavioral-evidence/{server_id}`
+          },
+          "§2.1.1_negative_path_envelope": {
+            criterion: "CTEF-compliant SUBJECT_NOT_TRACKED error envelope",
+            passing_servers: total,
+            total_servers: total,
+            pct: 100,
+            note: "Observatory provides compliant negative-path shape for any server query"
+          },
+          "§3.4_sla_tier": {
+            criterion: "Server classified into Platinum/Gold/Silver/Bronze SLA tier",
+            passing_servers: withEvidence,
+            total_servers: total,
+            pct: pctEvidence,
+            endpoint: `${url.origin}/api/sla-tier`
+          },
+          "§4.5.6_behavioral_drift_flag": {
+            criterion: "Behavioral drift detection active (≥2 daily snapshots)",
+            passing_servers: withDriftCount,
+            total_servers: total,
+            pct: pctDrift,
+            endpoint: `${url.origin}/api/trust-delta`
+          }
+        },
+        trust_grade_distribution: {
+          "A": gradeARow?.n || 0,
+          "B": gradeBRow?.n || 0,
+          "C": gradeCRow?.n || 0,
+          "D": gradeDRow?.n || 0,
+          "F": gradeFRow?.n || 0,
+          "ungraded": total - withEvidence,
+          "graded_total": withEvidence,
+          "total": total
+        },
+        resources: {
+          check_server_readiness: `${url.origin}/api/ctef/readiness/{server_id}`,
+          validate_ctef_compliance: `${url.origin}/api/ctef/validate`,
+          generate_conformance_doc: `${url.origin}/api/ctef/attest`,
+          trust_grade_badge: `${url.origin}/api/trust-badge/{server_id}`,
+          observatory_stats: `${url.origin}/api/stats`,
+          self_attestation: `${url.origin}/.well-known/ctef-conformance`,
+          openapi_spec: `${url.origin}/openapi.json`
+        },
+        claim_uri: `${url.origin}/.well-known/mcp-observatory`
+      };
+      return new Response(JSON.stringify(ecoDoc, null, 2), {
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "public, max-age=900",
+          "Access-Control-Allow-Origin": "*",
+          "X-CTEF-Version": "0.3.2",
+          "X-Schema": "ctef-ecosystem/v1",
           "X-Observatory": url.origin
         }
       });
