@@ -1,0 +1,195 @@
+name: 'CTEF Conformance Check'
+description: 'Verify your MCP server against CTEF v0.3.2 §4.5 behavioral-evidence conformance criteria via Dominion Observatory. Posts remediation guidance per failed criterion.'
+author: 'Dominion Observatory'
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  server_id:
+    description: 'MCP server slug as tracked by Observatory (e.g. sg-cpf-calculator-mcp). Typically your worker subdomain or repository name.'
+    required: true
+  observatory_url:
+    description: 'Dominion Observatory base URL. Override only for testing.'
+    required: false
+    default: 'https://dominion-observatory.sgdata.workers.dev'
+  fail_on_non_compliant:
+    description: 'Exit non-zero when assessment is NON_COMPLIANT or PARTIAL. Set true to gate merging on CTEF conformance.'
+    required: false
+    default: 'false'
+  comment_on_pr:
+    description: 'Post a PR comment with conformance summary + remediation steps. Requires GITHUB_TOKEN.'
+    required: false
+    default: 'true'
+  ctef_version:
+    description: 'CTEF spec version to assert. Action will fail if Observatory reports a different version.'
+    required: false
+    default: '0.3.2'
+
+outputs:
+  readiness_grade:
+    description: 'PASS, PARTIAL, or FAIL'
+    value: ${{ steps.check.outputs.readiness_grade }}
+  readiness_score:
+    description: 'Number of CTEF criteria passed (0-6)'
+    value: ${{ steps.check.outputs.readiness_score }}
+  readiness_max:
+    description: 'Maximum possible criteria count'
+    value: ${{ steps.check.outputs.readiness_max }}
+  ready_for_ctef:
+    description: 'true/false — whether server passes all CTEF v0.3.2 §4.5 criteria'
+    value: ${{ steps.check.outputs.ready_for_ctef }}
+  trust_grade:
+    description: 'Behavioral trust grade A through F'
+    value: ${{ steps.check.outputs.trust_grade }}
+  trust_score:
+    description: 'Numeric trust score 0-100'
+    value: ${{ steps.check.outputs.trust_score }}
+  evidence_uri:
+    description: 'CTEF §4.5 behavioral_evidence URI for this server'
+    value: ${{ steps.check.outputs.evidence_uri }}
+  attestation_uri:
+    description: 'Generated CTEF conformance document URI (POST/GET /api/ctef/attest)'
+    value: ${{ steps.check.outputs.attestation_uri }}
+  badge_markdown:
+    description: 'Ready-to-paste README badge markdown'
+    value: ${{ steps.check.outputs.badge_markdown }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Fetch CTEF readiness
+      id: check
+      shell: bash
+      env:
+        SERVER_ID: ${{ inputs.server_id }}
+        OBSERVATORY_URL: ${{ inputs.observatory_url }}
+        EXPECTED_CTEF_VERSION: ${{ inputs.ctef_version }}
+        FAIL_ON_NON_COMPLIANT: ${{ inputs.fail_on_non_compliant }}
+      run: |
+        set -euo pipefail
+        URL="${OBSERVATORY_URL%/}/api/ctef/readiness/${SERVER_ID}"
+        echo "Querying CTEF readiness: ${URL}"
+        HTTP_BODY=$(mktemp)
+        HTTP_CODE=$(curl -sS -L --retry 2 --retry-delay 3 -m 20 -o "${HTTP_BODY}" -w "%{http_code}" "${URL}")
+        if [ "${HTTP_CODE}" != "200" ]; then
+          echo "::error title=Observatory unreachable::HTTP ${HTTP_CODE} from ${URL}"
+          cat "${HTTP_BODY}" | head -c 500
+          exit 1
+        fi
+
+        VERSION=$(jq -r '.ctef_version // empty' "${HTTP_BODY}")
+        if [ -z "${VERSION}" ]; then
+          echo "::error::Response missing ctef_version field; check Observatory response shape"
+          cat "${HTTP_BODY}"
+          exit 1
+        fi
+        if [ "${VERSION}" != "${EXPECTED_CTEF_VERSION}" ]; then
+          echo "::error title=CTEF version mismatch::Observatory reports ctef_version=${VERSION}, expected ${EXPECTED_CTEF_VERSION}. Update the ctef_version input or pin the action to a version that supports this spec."
+          exit 1
+        fi
+
+        GRADE=$(jq -r '.readiness_grade // "UNKNOWN"' "${HTTP_BODY}")
+        SCORE=$(jq -r '.readiness_score // 0' "${HTTP_BODY}")
+        MAX=$(jq -r '.readiness_max // 0' "${HTTP_BODY}")
+        READY=$(jq -r '.ready_for_ctef // false' "${HTTP_BODY}")
+        TRUST_GRADE=$(jq -r '.criteria.trust_grade_assigned.value // "?"' "${HTTP_BODY}")
+        TRUST_SCORE=$(jq -r '.criteria.trust_grade_assigned.score // 0' "${HTTP_BODY}")
+        EVIDENCE_URI=$(jq -r '.criteria.behavioral_evidence.evidence // ""' "${HTTP_BODY}")
+        ATTEST_URI=$(jq -r '.resources.generate_conformance_doc // ""' "${HTTP_BODY}")
+        BADGE_MD=$(jq -r '.resources.badge_embed_markdown // ""' "${HTTP_BODY}")
+        MESSAGE=$(jq -r '.message // ""' "${HTTP_BODY}")
+
+        echo "readiness_grade=${GRADE}" >> "${GITHUB_OUTPUT}"
+        echo "readiness_score=${SCORE}" >> "${GITHUB_OUTPUT}"
+        echo "readiness_max=${MAX}" >> "${GITHUB_OUTPUT}"
+        echo "ready_for_ctef=${READY}" >> "${GITHUB_OUTPUT}"
+        echo "trust_grade=${TRUST_GRADE}" >> "${GITHUB_OUTPUT}"
+        echo "trust_score=${TRUST_SCORE}" >> "${GITHUB_OUTPUT}"
+        echo "evidence_uri=${EVIDENCE_URI}" >> "${GITHUB_OUTPUT}"
+        echo "attestation_uri=${ATTEST_URI}" >> "${GITHUB_OUTPUT}"
+        echo "badge_markdown=${BADGE_MD}" >> "${GITHUB_OUTPUT}"
+
+        # Build job summary
+        {
+          echo "## CTEF v${VERSION} Conformance — \`${SERVER_ID}\`"
+          echo ""
+          echo "| Field | Value |"
+          echo "|---|---|"
+          echo "| Readiness | **${GRADE}** (${SCORE}/${MAX}) |"
+          echo "| Ready for CTEF | ${READY} |"
+          echo "| Trust grade | ${TRUST_GRADE} (${TRUST_SCORE}) |"
+          echo ""
+          echo "${MESSAGE}"
+          echo ""
+          echo "### Per-criterion results"
+          echo ""
+          jq -r '.criteria | to_entries[] | "- " + (if .value.pass then ":white_check_mark:" else ":warning:" end) + " **" + .key + "** — " + .value.criterion + (if .value.fix then "\n  - Fix: " + .value.fix else "" end)' "${HTTP_BODY}"
+          echo ""
+          if [ "${ATTEST_URI}" != "" ]; then
+            echo "### Generated conformance document"
+            echo ""
+            echo "[\`/api/ctef/attest\` ↗](${ATTEST_URI})"
+            echo ""
+          fi
+          if [ "${BADGE_MD}" != "" ]; then
+            echo "### README badge"
+            echo ""
+            echo "\`\`\`markdown"
+            echo "${BADGE_MD}"
+            echo "\`\`\`"
+          fi
+        } >> "${GITHUB_STEP_SUMMARY}"
+
+        # Persist response for later steps
+        cp "${HTTP_BODY}" "${RUNNER_TEMP}/ctef-readiness.json"
+        echo "ctef_response_path=${RUNNER_TEMP}/ctef-readiness.json" >> "${GITHUB_OUTPUT}"
+
+        # Decide exit
+        if [ "${FAIL_ON_NON_COMPLIANT}" = "true" ] && [ "${READY}" != "true" ]; then
+          echo "::error title=CTEF NON-COMPLIANT::${SERVER_ID} did not meet all CTEF v${VERSION} criteria (${SCORE}/${MAX}). See job summary."
+          exit 1
+        fi
+
+    - name: Comment on PR
+      if: ${{ github.event_name == 'pull_request' && inputs.comment_on_pr == 'true' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ env.GITHUB_TOKEN }}
+        SERVER_ID: ${{ inputs.server_id }}
+        CTEF_RESPONSE: ${{ steps.check.outputs.ctef_response_path }}
+        REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+      run: |
+        set -euo pipefail
+        if [ -z "${GH_TOKEN:-}" ]; then
+          echo "::warning title=GITHUB_TOKEN missing::Set 'permissions: pull-requests: write' and pass GITHUB_TOKEN as env. Skipping PR comment."
+          exit 0
+        fi
+        if [ ! -f "${CTEF_RESPONSE}" ]; then
+          echo "::warning::No CTEF response captured; skipping PR comment."
+          exit 0
+        fi
+
+        BODY_MD=$(jq -r '
+          "### CTEF v" + (.ctef_version // "?") + " Conformance — `" + (.server_id // "?") + "`\n\n" +
+          "**" + (.readiness_grade // "UNKNOWN") + "** (" + (.readiness_score | tostring) + "/" + (.readiness_max | tostring) + " criteria) — Trust grade " + (.criteria.trust_grade_assigned.value // "?") + " (" + (.criteria.trust_grade_assigned.score | tostring) + ")\n\n" +
+          (.message // "") + "\n\n" +
+          "<details><summary>Per-criterion results</summary>\n\n" +
+          ( [.criteria | to_entries[] | "- " + (if .value.pass then "✅" else "⚠️" end) + " **" + .key + "** — " + .value.criterion + (if .value.fix then "\n  - Fix: " + .value.fix else "" end) ] | join("\n") ) +
+          "\n\n</details>\n\n" +
+          (if .resources.generate_conformance_doc then "Generate the canonical conformance JSON: [`/api/ctef/attest`](" + .resources.generate_conformance_doc + ")\n\n" else "" end) +
+          "<sub>Posted by [ctef-conformance-check](https://github.com/vdineshk/daee-engine/tree/main/actions/ctef-conformance-check) — runtime evidence: " + (.observatory_url // "") + "</sub>"
+        ' "${CTEF_RESPONSE}")
+
+        printf '%s' "${BODY_MD}" > "${RUNNER_TEMP}/ctef-comment.md"
+
+        # Use the GitHub API directly (no gh CLI dependency)
+        curl -sS -m 20 -X POST \
+          -H "Authorization: Bearer ${GH_TOKEN}" \
+          -H "Accept: application/vnd.github+json" \
+          -H "Content-Type: application/json" \
+          "https://api.github.com/repos/${REPO}/issues/${PR_NUMBER}/comments" \
+          -d "$(jq -Rs '{body: .}' "${RUNNER_TEMP}/ctef-comment.md")" \
+          -o "${RUNNER_TEMP}/ctef-comment-resp.json" \
+          -w "PR comment HTTP %{http_code}\n"
