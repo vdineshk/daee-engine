@@ -1,0 +1,38 @@
+# Drop-in CTEF conformance workflow for any MCP server repository.
+# Save as `.github/workflows/ctef-conformance.yml` in your MCP server repo.
+#
+# 1. Replace `my-mcp-server` with your Observatory slug
+# 2. (optional) Set fail_on_non_compliant: 'true' to gate merges
+# 3. Commit and push — the next PR will receive a CTEF conformance comment
+
+name: CTEF Conformance
+on:
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  ctef-readiness:
+    name: Verify CTEF v0.3.2 conformance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check CTEF readiness via Dominion Observatory
+        id: ctef
+        uses: vdineshk/daee-engine/actions/ctef-conformance-check@main
+        with:
+          server_id: my-mcp-server
+          fail_on_non_compliant: 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Surface results in workflow log
+        run: |
+          echo "Readiness: ${{ steps.ctef.outputs.readiness_grade }} (${{ steps.ctef.outputs.readiness_score }}/${{ steps.ctef.outputs.readiness_max }})"
+          echo "Trust grade: ${{ steps.ctef.outputs.trust_grade }} (${{ steps.ctef.outputs.trust_score }})"
+          echo "Ready for CTEF: ${{ steps.ctef.outputs.ready_for_ctef }}"
+          echo "Evidence: ${{ steps.ctef.outputs.evidence_uri }}"
+          echo "Attestation doc: ${{ steps.ctef.outputs.attestation_uri }}"
