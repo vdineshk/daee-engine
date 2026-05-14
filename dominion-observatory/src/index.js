@@ -3060,6 +3060,81 @@ Sitemap: ${url.origin}/sitemap.xml
         }
       });
     }
+    // -- GET /badge/:slug -- SVG trust badge -------
+    if (url.pathname.startsWith("/badge/") && url.pathname !== "/badge/") {
+      const badgeSlug = decodeURIComponent(url.pathname.replace("/badge/", "").replace(/\/$/, ""));
+      if (!badgeSlug) {
+        return new Response("slug required", { status: 400 });
+      }
+
+      let score = null;
+      let scoreText = "not found";
+      let color = "#9f9f9f"; // gray -- server not found
+
+      try {
+        const server = await db.prepare(
+          "SELECT trust_score FROM servers WHERE url LIKE ? OR LOWER(REPLACE(REPLACE(REPLACE(name, ' ', '-'), '.', '-'), '/', '-')) = ? LIMIT 1"
+        ).bind("%" + badgeSlug + "%", badgeSlug).first();
+
+        if (server) {
+          score = Math.round((server.trust_score || 0) * 10) / 10;
+          scoreText = String(Math.round(score));
+          if (score >= 60) {
+            color = "#4c1";      // green -- PASS
+          } else if (score >= 40) {
+            color = "#dfb317";   // yellow -- UNCERTAIN
+          } else {
+            color = "#e05d44";   // red -- FAIL
+          }
+        }
+      } catch (e) {
+        // DB error -- show gray badge
+        scoreText = "error";
+        color = "#9f9f9f";
+      }
+
+      const label = "trust score";
+      const value = scoreText;
+      const charWidth = 6.5;
+      const pad = 10;
+      const labelW = Math.round(label.length * charWidth + pad);
+      const valueW = Math.round(value.length * charWidth + pad);
+      const totalW = labelW + valueW;
+      const labelX = labelW / 2;
+      const valueX = labelW + valueW / 2;
+      const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${totalW}" height="20" role="img" aria-label="${esc(label)}: ${esc(value)}">
+  <title>${esc(label)}: ${esc(value)}</title>
+  <linearGradient id="s" x2="0" y2="100%">
+    <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+    <stop offset="1" stop-opacity=".1"/>
+  </linearGradient>
+  <clipPath id="r">
+    <rect width="${totalW}" height="20" rx="3" fill="#fff"/>
+  </clipPath>
+  <g clip-path="url(#r)">
+    <rect width="${labelW}" height="20" fill="#555"/>
+    <rect x="${labelW}" width="${valueW}" height="20" fill="${color}"/>
+    <rect width="${totalW}" height="20" fill="url(#s)"/>
+  </g>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="110">
+    <text aria-hidden="true" x="${labelX * 10}" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="${(labelW - pad) * 10}">${esc(label)}</text>
+    <text x="${labelX * 10}" y="140" transform="scale(.1)" fill="#fff" textLength="${(labelW - pad) * 10}">${esc(label)}</text>
+    <text aria-hidden="true" x="${valueX * 10}" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="${(valueW - pad) * 10}">${esc(value)}</text>
+    <text x="${valueX * 10}" y="140" transform="scale(.1)" fill="#fff" textLength="${(valueW - pad) * 10}">${esc(value)}</text>
+  </g>
+</svg>`;
+
+      return new Response(svg, {
+        status: 200,
+        headers: {
+          "Content-Type": "image/svg+xml",
+          "Cache-Control": "public, max-age=300, s-maxage=300",
+          "Access-Control-Allow-Origin": "*",
+        },
+      });
+    }
     if (url.pathname === "/llms.txt") {
       return new Response(
 `# Dominion Observatory — MCP Behavioral Trust Layer
@@ -3080,6 +3155,7 @@ Tracking 4,500+ MCP servers across 16 categories.
 /.well-known/mcp-observatory          — machine-readable discovery metadata
 POST /mcp                             — MCP tools interface (tools/list, tools/call)
 /api/badge?url={server_url}           — SVG trust score badge for READMEs
+/badge/{server_slug}                  — SVG trust score badge by slug (shields.io flat style)
 /api/agent-readiness?url={url}        — agent-readiness scanner (llms.txt, openapi, well-known, MCP)
 
 ## Payment-gated endpoints
@@ -3140,6 +3216,11 @@ Returns: JSON Schema for the mcp-behavioral-evidence-v1.0 evidence format
 
 ### GET /api/badge?url={server_url}
 Returns: SVG image (image/svg+xml) — trust score badge for embedding in READMEs
+
+### GET /badge/{server_slug}
+Returns: SVG image (image/svg+xml) — shields.io flat-style trust score badge
+Color-coded: green (>=60, PASS), yellow (40-59, UNCERTAIN), red (<40, FAIL), gray (not found)
+Cached for 5 minutes. Usage: ![Trust Score](https://dominion-observatory.sgdata.workers.dev/badge/your-server-slug)
 
 ### GET /api/agent-readiness?url={root_or_mcp_url}
 Returns: { score, discoverability_score, comprehension_score, usability_score, trustability_score,

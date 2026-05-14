@@ -105,6 +105,31 @@ if (evaluation.decision === "PASS") {
 curl https://dominion-observatory.sgdata.workers.dev/api/agent-query/sg-cpf-calculator
 ```
 
+### Embed a trust badge
+
+Display your MCP server's live trust score as a badge in any README or documentation:
+
+```markdown
+![Trust Score](https://dominion-observatory.sgdata.workers.dev/badge/your-server-slug)
+```
+
+Examples with real servers:
+
+```markdown
+![Trust Score](https://dominion-observatory.sgdata.workers.dev/badge/sg-cpf-calculator)
+```
+
+The badge auto-updates every 5 minutes and is color-coded:
+
+| Color | Score | Decision |
+|-------|-------|----------|
+| Green | 60+ | PASS |
+| Yellow | 40-59 | UNCERTAIN |
+| Red | < 40 | FAIL |
+| Gray | — | Server not found |
+
+Use it in your MCP server's README to signal trust to consumers.
+
 ## How trust scoring works
 
 The Observatory tracks behavioral attestation data for every registered MCP server:
