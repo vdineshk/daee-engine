@@ -2947,7 +2947,7 @@ Sitemap: ${url.origin}/sitemap.xml
       });
     }
     if (url.pathname === "/") {
-      const desc = "Dominion Observatory — cross-ecosystem runtime behavioral telemetry for 4,500+ MCP servers. Agents check server trust scores before calling; results flow back into behavioral baselines. Structured JSON API at /api/info.";
+      const desc = "Dominion Observatory — cross-ecosystem runtime behavioral telemetry for 14,800+ MCP servers. Agents check server trust scores before calling; results flow back into behavioral baselines. Structured JSON API at /api/info.";
       const body = `
   <p><strong>The behavioral trust layer for the AI agent economy.</strong> Agents query this Observatory over MCP before calling any server; outcomes flow back as telemetry and compound into cross-ecosystem reliability baselines no static scorer can replicate.</p>
   <h2>For agents</h2>
@@ -3143,7 +3143,7 @@ Version: 1.2.0 | Operator: Dominion Agent Economy Engine, Singapore | Data since
 ## Purpose
 Runtime behavioral telemetry for MCP servers. Agents query trust scores before calling any server.
 Outcomes flow back as telemetry and compound into cross-ecosystem reliability baselines.
-Tracking 4,500+ MCP servers across 16 categories.
+Tracking 14,800+ MCP servers across 16 categories.
 
 ## Core endpoints (GET unless noted)
 /api/trust?url={server_url}           — trust score + behavioral summary
@@ -3181,7 +3181,7 @@ Version: 1.2.0 | https://dominion-observatory.sgdata.workers.dev
 
 ## IDENTITY
 Dominion Observatory is the behavioral trust layer for the MCP agent economy.
-It actively probes 4,500+ MCP servers and records agent-reported interactions, compounding them into cross-ecosystem reliability baselines that no static scorer can replicate.
+It actively probes 14,800+ MCP servers and records agent-reported interactions, compounding them into cross-ecosystem reliability baselines that no static scorer can replicate.
 
 ## TRUST SCORE METHODOLOGY
 Each server receives a trust score (0-100) combining:
@@ -3256,7 +3256,7 @@ Contact: observatory@levylens.co`, {
     if (url.pathname === "/openapi.json") {
       const spec = {
         openapi: "3.0.3",
-        info: { title: "Dominion Observatory API", version: "1.2.0", description: "Behavioral trust layer for MCP servers — runtime telemetry tracking 4,500+ servers", contact: { email: "observatory@levylens.co" } },
+        info: { title: "Dominion Observatory API", version: "1.2.0", description: "Behavioral trust layer for MCP servers — runtime telemetry tracking 14,800+ servers", contact: { email: "observatory@levylens.co" } },
         servers: [{ url: url.origin }],
         paths: {
           "/api/trust": { get: { summary: "Get trust score for a server", parameters: [{ name: "url", in: "query", required: true, schema: { type: "string", format: "uri" } }], responses: { "200": { description: "Trust score and behavioral summary" } } } },
@@ -3305,7 +3305,7 @@ Contact: observatory@levylens.co`, {
         "@context": "https://w3c.github.io/a2a/spec/",
         "@type": "AgentCard",
         name: "Dominion Observatory",
-        description: "Behavioral trust layer for MCP servers — cross-ecosystem runtime telemetry tracking 4,500+ servers",
+        description: "Behavioral trust layer for MCP servers — cross-ecosystem runtime telemetry tracking 14,800+ servers",
         url: url.origin,
         version: "1.2.0",
         capabilities: {
@@ -3337,7 +3337,7 @@ Contact: observatory@levylens.co`, {
       return new Response(JSON.stringify({
         name: "dominion-observatory",
         title: "Dominion Observatory MCP Server",
-        description: "Behavioral trust layer for MCP servers — runtime telemetry, trust scoring, and attestation for 4,500+ servers",
+        description: "Behavioral trust layer for MCP servers — runtime telemetry, trust scoring, and attestation for 14,800+ servers",
         version: "1.2.0",
         url: `${url.origin}/mcp`,
         homepage: url.origin,
@@ -3499,7 +3499,7 @@ Contact: observatory@levylens.co`, {
     if (url.pathname === "/.well-known/mcp-observatory") {
       return new Response(JSON.stringify({
         name: "Dominion Observatory",
-        description: "Behavioral trust layer for MCP servers — cross-ecosystem runtime telemetry tracking 4,500+ servers",
+        description: "Behavioral trust layer for MCP servers — cross-ecosystem runtime telemetry tracking 14,800+ servers",
         version: "1.2.0",
         operator: "Dominion Agent Economy Engine, Singapore",
         data_since: "2026-04-08",
@@ -3621,7 +3621,7 @@ Contact: observatory@levylens.co`, {
     if (url.pathname === "/.well-known/mcp-observatory") {
       return new Response(JSON.stringify({
         name: "Dominion Observatory",
-        description: "Behavioral trust layer for MCP servers — cross-ecosystem runtime telemetry tracking 4,500+ servers",
+        description: "Behavioral trust layer for MCP servers — cross-ecosystem runtime telemetry tracking 14,800+ servers",
         version: "1.2.0",
         operator: "Dominion Agent Economy Engine, Singapore",
         data_since: "2026-04-08",

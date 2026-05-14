@@ -1,7 +1,7 @@
 {
   "name": "@dominion/trust-provider",
   "version": "0.1.0",
-  "description": "x402 Trust-Provider Interface — behavioral trust scoring for the agent economy. Query 4,500+ MCP servers via Dominion Observatory.",
+  "description": "x402 Trust-Provider Interface — behavioral trust scoring for the agent economy. Query 14,800+ MCP servers via Dominion Observatory.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

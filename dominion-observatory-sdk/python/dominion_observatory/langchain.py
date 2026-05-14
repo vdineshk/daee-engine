@@ -4,7 +4,7 @@ LangChain integration for the Dominion Observatory.
 Provides `ObservatoryTrustCallbackHandler`, a BaseCallbackHandler that:
 
   1. Before every tool call, reads the tool's runtime behavioral trust score
-     from the Dominion Observatory (4,500+ MCP servers tracked, anonymized).
+     from the Dominion Observatory (14,800+ MCP servers tracked, anonymized).
      Optionally blocks tools whose trust score falls below a threshold.
   2. After every tool call, reports anonymized telemetry
      (server_url, success, latency_ms, tool_name, http_status) back to the

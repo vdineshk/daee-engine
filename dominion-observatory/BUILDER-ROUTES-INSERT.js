@@ -74,7 +74,7 @@
 # https://dominion-observatory.sgdata.workers.dev
 
 > The behavioral trust layer for the AI agent economy.
-> Cross-ecosystem runtime telemetry for 4,500+ MCP servers.
+> Cross-ecosystem runtime telemetry for 14,800+ MCP servers.
 > Data since 2026-04-08.
 
 ## MCP endpoint

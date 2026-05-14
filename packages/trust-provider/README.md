@@ -5,7 +5,7 @@
 [![npm](https://img.shields.io/npm/v/@dominion/trust-provider)](https://www.npmjs.com/package/@dominion/trust-provider)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Query **4,500+ MCP servers** via [Dominion Observatory](https://dominion-observatory.sgdata.workers.dev) and gate payments using the [x402 Trust-Provider Interface v0.1](https://github.com/vdineshk/daee-engine/blob/main/specs/x402-trust-provider-interface/v0.1/SPEC.md).
+Query **14,800+ MCP servers** via [Dominion Observatory](https://dominion-observatory.sgdata.workers.dev) and gate payments using the [x402 Trust-Provider Interface v0.1](https://github.com/vdineshk/daee-engine/blob/main/specs/x402-trust-provider-interface/v0.1/SPEC.md).
 
 ## Install
 
@@ -140,7 +140,7 @@ interface TrustEvaluation {
 
 ## Links
 
-- [Dominion Observatory](https://dominion-observatory.sgdata.workers.dev) — live trust data for 4,500+ MCP servers
+- [Dominion Observatory](https://dominion-observatory.sgdata.workers.dev) — live trust data for 14,800+ MCP servers
 - [x402 Trust-Provider Spec v0.1](https://github.com/vdineshk/daee-engine/blob/main/specs/x402-trust-provider-interface/v0.1/SPEC.md)
 - [x402 Protocol](https://github.com/x402-foundation/x402)
 
