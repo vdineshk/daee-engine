@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "langchain-trust-gate"
+version = "0.1.0"
+description = "LangChain tool for behavioral trust scoring via Dominion Observatory"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+authors = [
+    { name = "Dominion DAEE", email = "vdineshk@gmail.com" },
+]
+keywords = ["langchain", "trust", "mcp", "agent", "observatory", "x402"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+]
+dependencies = [
+    "langchain-core>=0.2.0",
+    "httpx>=0.25.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/vdineshk/daee-engine"
+Repository = "https://github.com/vdineshk/daee-engine/tree/main/packages/langchain-trust-gate"
+Documentation = "https://dominion-observatory.sgdata.workers.dev"
