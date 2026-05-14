@@ -1,0 +1,41 @@
+# DAEE Engine
+
+> Dominion Agent Economy Engine
+
+## Overview
+
+Behavioral trust scoring, MCP servers, and x402 payment gating for autonomous AI agents. Live Observatory tracking 4,500+ MCP servers with trust scores based on interaction history, success rates, latency, and uptime.
+
+## Components
+
+- Dominion Observatory: Live behavioral trust registry for MCP servers
+- dominion-observatory-sdk: Agent behavioral telemetry SDK (npm)
+- langchain-trust-gate: LangChain tool for trust-gated agent actions
+- x402 Trust-Provider Interface: Open spec for trust in agent payments
+
+## MCP Tools (8)
+
+- get-trust-score: Trust score (0-100) for any MCP server
+- query-server: Full behavioral profile with evidence
+- list-servers: Browse tracked servers
+- check-health: Server health and uptime
+- get-categories: Discover by category
+- search-servers: Find by name, URL, or capability
+- get-attestation-history: Historical trust trends
+- get-server-stats: Aggregate registry statistics
+
+## Links
+
+- Repository: https://github.com/vdineshk/daee-engine
+- Observatory: https://dominion-observatory.sgdata.workers.dev
+- npm: https://www.npmjs.com/package/dominion-observatory
+- Smithery: https://smithery.ai/servers/vdineshk/dominion-observatory
+- Spec: https://github.com/vdineshk/daee-engine/blob/main/specs/x402-trust-provider-interface/v0.1/SPEC.md
+
+## Install
+
+npx dominion-observatory
+
+## License
+
+MIT
