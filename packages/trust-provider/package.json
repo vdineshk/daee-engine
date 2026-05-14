@@ -1,0 +1,41 @@
+{
+  "name": "@dominion/trust-provider",
+  "version": "0.1.0",
+  "description": "x402 Trust-Provider Interface — behavioral trust scoring for the agent economy. Query 4,500+ MCP servers via Dominion Observatory.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "x402",
+    "trust",
+    "mcp",
+    "agent",
+    "observatory",
+    "behavioral-trust",
+    "model-context-protocol",
+    "beforeSettle",
+    "trust-provider"
+  ],
+  "author": "Dominion DAEE <vdineshk@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vdineshk/daee-engine",
+    "directory": "packages/trust-provider"
+  },
+  "homepage": "https://github.com/vdineshk/daee-engine/tree/main/packages/trust-provider",
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}
