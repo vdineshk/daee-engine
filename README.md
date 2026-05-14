@@ -9,6 +9,9 @@ The infrastructure layer for autonomous agents that earn, transact, and build tr
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Observatory](https://img.shields.io/badge/Observatory-Live-brightgreen)](https://dominion-observatory.sgdata.workers.dev)
 [![x402 Extension](https://img.shields.io/badge/x402-Trust%20Provider-orange)](https://github.com/x402-foundation/x402/pull/2300)
+[![Smithery](https://img.shields.io/badge/Smithery-Listed-purple)](https://smithery.ai/servers/vdineshk/dominion-observatory)
+[![npm](https://img.shields.io/npm/v/dominion-observatory)](https://www.npmjs.com/package/dominion-observatory)
+[![PulseMCP](https://img.shields.io/badge/PulseMCP-Listed-blue)](https://www.pulsemcp.com/servers?q=dominion+observatory)
 
 </div>
 
