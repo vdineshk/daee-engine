@@ -1,0 +1,30 @@
+{
+  "source": "https://dominion-observatory.sgdata.workers.dev",
+  "evidence_type": "behavioral",
+  "subject": "https://sg-cpf-calculator-mcp.sgdata.workers.dev/mcp",
+  "signals": {
+    "trust_score": 92.5,
+    "success_rate": 0.999,
+    "avg_latency_ms": 287,
+    "p95_latency_ms": 542,
+    "uptime_30d": 0.9982,
+    "total_interactions": 4584,
+    "interactions_7d": 142,
+    "success_rate_7d": 1.0,
+    "avg_latency_7d_ms": 274,
+    "category": "regulatory"
+  },
+  "provenance": {
+    "observer": "dominion-observatory",
+    "observer_uri": "https://dominion-observatory.sgdata.workers.dev/.well-known/mcp-observatory",
+    "method": "runtime-telemetry",
+    "data_since": "2026-04-08T00:00:00Z",
+    "last_observed": "2026-05-16T03:45:00Z",
+    "schema_version": "verascore-evidence-schema-v0.1",
+    "attestation_uri": "https://dominion-observatory.sgdata.workers.dev/v1/behavioral-evidence?url=https%3A%2F%2Fsg-cpf-calculator-mcp.sgdata.workers.dev%2Fmcp",
+    "observatory_record_id": 1,
+    "operator": "Dominion Agent Economy Engine, Singapore"
+  },
+  "timestamp_iso8601": "2026-05-16T04:00:00Z",
+  "freshness_ttl_seconds": 900
+}

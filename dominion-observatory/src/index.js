@@ -2828,6 +2828,95 @@ Sitemap: ${url.origin}/sitemap.xml
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
       });
     }
+    if (url.pathname === "/api/trust/verascore" && request.method === "GET") {
+      // Schema-conformant wrapper over /api/trust emitting
+      // verascore-evidence-schema-v0.1 records. Out-of-band commitment
+      // tracked in A2A #1786. Required canonical fields (per
+      // @arian-gogani): source | evidence_type | subject | signals |
+      // provenance | timestamp_iso8601 | freshness_ttl_seconds.
+      const subjectParam = url.searchParams.get("subject") || url.searchParams.get("url");
+      if (!subjectParam) {
+        return new Response(JSON.stringify({
+          error: "subject parameter required (server URL or slug)",
+          example: `${url.origin}/api/trust/verascore?subject=https://sg-cpf-calculator-mcp.sgdata.workers.dev/mcp`
+        }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      const COLS = "id, url, name, category, trust_score, total_calls, successful_calls, avg_latency_ms, p95_latency_ms, uptime_30d, first_seen, last_checked";
+      let server = await db.prepare(`SELECT ${COLS} FROM servers WHERE url = ? LIMIT 1`).bind(subjectParam).first();
+      if (!server) {
+        const slugLike = `%${subjectParam.toLowerCase()}%`;
+        server = await db.prepare(
+          `SELECT ${COLS} FROM servers WHERE LOWER(url) LIKE ? OR LOWER(name) LIKE ? LIMIT 1`
+        ).bind(slugLike, slugLike).first();
+      }
+      if (!server) {
+        return new Response(JSON.stringify({
+          error: "subject not found in Observatory index",
+          subject: subjectParam,
+          hint: "Pass a server URL (https://...) or a slug substring; register via POST /api/register if untracked."
+        }), {
+          status: 404,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      const recent = await db.prepare(
+        "SELECT COUNT(*) as count, AVG(latency_ms) as avg_lat, SUM(success) as ok_count FROM interactions WHERE server_id = ? AND timestamp > datetime('now', '-7 days')"
+      ).bind(server.id).first();
+      const successRate = server.total_calls > 0 ? server.successful_calls / server.total_calls : null;
+      const recent7dCount = recent?.count || 0;
+      const recent7dOk = recent?.ok_count || 0;
+      const trustScore = Math.round(server.trust_score * 10) / 10;
+      const nowIso = new Date().toISOString();
+      // Field mapping (verascore-evidence-schema-v0.1 ← Observatory):
+      //   source                 ← worker origin (Observatory's canonical URI)
+      //   evidence_type          ← "behavioral" (one of: regulatory|behavioral|attestation|cryptographic)
+      //   subject                ← servers.url (the canonical server_id Observatory tracks)
+      //   signals                ← per-server runtime aggregates from servers + 7d slice from interactions
+      //   provenance             ← observer identity, method, attestation_uri pointing at /v1/behavioral-evidence
+      //   timestamp_iso8601      ← emission time (now)
+      //   freshness_ttl_seconds  ← 900 — matches Observatory's 15-min cron (wrangler.toml triggers.crons)
+      const evidence = {
+        source: url.origin,
+        evidence_type: "behavioral",
+        subject: server.url,
+        signals: {
+          trust_score: trustScore,
+          success_rate: successRate !== null ? Math.round(successRate * 1e4) / 1e4 : null,
+          avg_latency_ms: server.avg_latency_ms ? Math.round(server.avg_latency_ms) : null,
+          p95_latency_ms: server.p95_latency_ms ? Math.round(server.p95_latency_ms) : null,
+          uptime_30d: server.uptime_30d,
+          total_interactions: server.total_calls,
+          interactions_7d: recent7dCount,
+          success_rate_7d: recent7dCount > 0 ? Math.round((recent7dOk / recent7dCount) * 1e4) / 1e4 : null,
+          avg_latency_7d_ms: recent?.avg_lat ? Math.round(recent.avg_lat) : null,
+          category: server.category || null
+        },
+        provenance: {
+          observer: "dominion-observatory",
+          observer_uri: `${url.origin}/.well-known/mcp-observatory`,
+          method: "runtime-telemetry",
+          data_since: server.first_seen,
+          last_observed: server.last_checked,
+          schema_version: "verascore-evidence-schema-v0.1",
+          attestation_uri: `${url.origin}/v1/behavioral-evidence?url=${encodeURIComponent(server.url)}`,
+          observatory_record_id: server.id,
+          operator: "Dominion Agent Economy Engine, Singapore"
+        },
+        timestamp_iso8601: nowIso,
+        freshness_ttl_seconds: 900
+      };
+      return new Response(JSON.stringify(evidence, null, 2), {
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+          "Cache-Control": "public, max-age=300",
+          "X-Schema": "verascore-evidence-schema-v0.1"
+        }
+      });
+    }
     if (url.pathname === "/api/leaderboard" && request.method === "GET") {
       const category = url.searchParams.get("category");
       const limit = parseInt(url.searchParams.get("limit") || "10");
