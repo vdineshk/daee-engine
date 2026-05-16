@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://verascore.ai/schemas/verascore-evidence-schema-v0.1.json",
+  "title": "Verascore Evidence Record — v0.1 (local working mirror)",
+  "description": "Local working mirror of the canonical schema published at https://verascore.ai/schemas/verascore-evidence-schema-v0.1.json. Field set, types, and evidence_type enum derived from A2A #1786 (@arian-gogani) and the Verascore docs page at https://verascore.ai/docs/evidence-schema-v0.1. Replace with the upstream artefact once it is fetchable from a CI runner; the canonical $id is preserved so a swap is a single-line change.",
+  "type": "object",
+  "required": [
+    "source",
+    "evidence_type",
+    "subject",
+    "signals",
+    "provenance",
+    "timestamp_iso8601",
+    "freshness_ttl_seconds"
+  ],
+  "properties": {
+    "source": {
+      "type": "string",
+      "format": "uri",
+      "description": "The emitting observer's canonical URI (e.g. https://dominion-observatory.sgdata.workers.dev)."
+    },
+    "evidence_type": {
+      "type": "string",
+      "enum": ["regulatory", "behavioral", "attestation", "cryptographic"],
+      "description": "Empire emits 'behavioral' per A2A #1786 commitment."
+    },
+    "subject": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The entity the evidence describes — for Observatory this is the MCP server URL (canonical server_id)."
+    },
+    "signals": {
+      "type": "object",
+      "minProperties": 1,
+      "description": "Source-specific signal payload. For behavioral evidence Observatory ships trust_score + success_rate + latency + uptime + interaction counts."
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["observer", "method"],
+      "properties": {
+        "observer": { "type": "string" },
+        "method": { "type": "string" }
+      },
+      "additionalProperties": true,
+      "description": "Who measured this, how, and where it can be verified."
+    },
+    "timestamp_iso8601": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "freshness_ttl_seconds": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": true
+}
